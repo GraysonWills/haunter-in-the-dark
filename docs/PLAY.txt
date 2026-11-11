@@ -1,0 +1,45 @@
+HAUNTER IN THE DARK - v0.3.0
+Windows 64-bit prototype
+
+GET STARTED
+1. Extract the entire ZIP using Extract All.
+2. Open the extracted folder and run HaunterInTheDark.exe.
+3. Press Enter to begin. Headphones help locate sounds.
+
+Unity is not needed to play. Keep the EXE beside HaunterInTheDark_Data,
+UnityPlayer.dll, MonoBleedingEdge, and all other included files. Do not
+run it from inside the ZIP or move the EXE by itself.
+
+YOUR OBJECTIVE
+Reach the exit door while avoiding the creature guarding it. Follow the
+arrow at the top of the screen. Sound sends ripples through the room,
+briefly revealing white outlines. The creature's pawsteps reveal it too.
+
+The creature is faster than your sprint. Crouch to reduce footstep noise.
+Pick up a nearby object and throw it away from your escape route. An
+impact close enough for the creature to hear can interrupt its pursuit.
+It commits to that impact, travels there, then investigates for five full
+seconds before returning to the exit. New sounds cannot redirect it or
+extend that investigation. Use the opening to sneak past, but avoid
+touching the creature even while it is distracted.
+
+CONTROLS
+WASD / mouse              Move / look
+Space or right mouse      Tap your cane
+Ctrl or C                 Crouch and move quietly
+Shift                     Sprint with louder footsteps
+E                         Pick up an object / use the exit
+Hold/release left mouse   Charge and throw the held object
+Q                         Drop the held object
+Esc                       Pause / resume and release the cursor
+R after an ending         Restart
+Alt+F4                    Close the game
+
+This is a single-room prototype with primitive art and procedural sound.
+This download is for Windows desktop, not a browser, macOS, or Linux.
+
+SOURCE, UPDATES, AND BUILD INSTRUCTIONS
+https://github.com/GraysonWills/haunter-in-the-dark
+
+LATEST RELEASE
+https://github.com/GraysonWills/haunter-in-the-dark/releases/latest
