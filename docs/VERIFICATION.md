@@ -16,6 +16,14 @@ The saved scene explicitly contains chase speed 5.8, return speed 4.8, paw inter
 
 Inspected actual captured frames for the title, cane wave, carried bottle (including facing a nearby wall), creature, and ending screens. Also used the normal Windows player UI to verify Enter starts play, Space taps the cane, Escape pauses and releases the cursor, and Start Again returns to the title.
 
+## Browser verification — November 11, 2026
+
+Built the same scene for WebGL 2 using Unity 2023.1.14f1, with Gzip compression and decompression fallback for ordinary static hosting. The complete site is approximately 5.4 MB. The final WebGL player passed all **50 integration checks with zero failures and zero Unity runtime errors**, including runtime navigation, echo shader pixels, held-object outlines, physical throwing, the five-second distraction commitment, capture, restart and an actual crouched escape through the door. Results and representative browser-rendered frames are in [evidence/webgl](evidence/webgl).
+
+Separate Chromium input checks verified starting with Enter, mouse capture and camera movement, walking, crouching, cane input, running Web Audio contexts producing non-silent buffers, Escape pause, Enter resume, and fullscreen entry/exit. An immediate resume after Escape safely returns to pause if the browser rejects mouse capture; another user gesture can retry. This also fixes Unity's deferred pointer-lock request missing a fast key-up event. Normal browser visits do not enable the test sequence or diagnostic state.
+
+Chromium emits six WebGL format-capability probe warnings during Unity startup; rendering checks pass and no console errors were recorded. Browser validation was performed on Windows in Chromium; mobile touch controls and cross-browser/platform testing remain outside this prototype's verification.
+
 ## Limits
 
 This is a one-room prototype with procedural placeholder models/audio. Automated checks cover the core loop but do not replace a full player-driven balance test. Mouse look, movement, crouching and charged throws should receive more playtesting before expanding the level. No validation was performed on macOS, Linux, mobile, URP or HDRP.

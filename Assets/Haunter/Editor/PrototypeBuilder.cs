@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -83,6 +84,46 @@ namespace Haunter.Editor
             if (report.summary.result != BuildResult.Succeeded)
                 throw new Exception("Windows build failed: " + report.summary.result);
             Debug.Log("HAUNTER_BUILD_OK " + report.summary.totalSize + " bytes");
+        }
+
+        [MenuItem("Haunter/Build browser prototype")]
+        public static void BuildWebGL()
+        {
+            ConfigureProject();
+            if (!BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.WebGL, BuildTarget.WebGL))
+                throw new Exception("Install WebGL Build Support for Unity 2023.1.14f1 before building the browser player.");
+            if (!File.Exists(ScenePath)) CreateScene();
+            EditorSceneManager.SaveOpenScenes();
+            PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.WebGL, false);
+            PlayerSettings.SetGraphicsAPIs(BuildTarget.WebGL, new[] { GraphicsDeviceType.OpenGLES3 });
+            PlayerSettings.SetIl2CppCodeGeneration(NamedBuildTarget.WebGL, Il2CppCodeGeneration.OptimizeSize);
+            PlayerSettings.WebGL.template = "PROJECT:Haunter";
+            PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
+            // GitHub Pages cannot add the Content-Encoding headers required by native decompression.
+            PlayerSettings.WebGL.decompressionFallback = true;
+            PlayerSettings.WebGL.threadsSupport = false;
+            PlayerSettings.WebGL.initialMemorySize = 128;
+            PlayerSettings.WebGL.maximumMemorySize = 1024;
+            PlayerSettings.WebGL.memoryGrowthMode = WebGLMemoryGrowthMode.Geometric;
+            PlayerSettings.WebGL.exceptionSupport = WebGLExceptionSupport.FullWithoutStacktrace;
+            PlayerSettings.WebGL.dataCaching = true;
+            PlayerSettings.WebGL.debugSymbolMode = WebGLDebugSymbolMode.Off;
+            PlayerSettings.WebGL.nameFilesAsHashes = true;
+            PlayerSettings.WebGL.showDiagnostics = false;
+            AssetDatabase.SaveAssets();
+            string directory = Path.GetFullPath("Builds/WebGL");
+            Directory.CreateDirectory(directory);
+            var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            {
+                scenes = new[] { ScenePath },
+                locationPathName = directory,
+                target = BuildTarget.WebGL,
+                options = BuildOptions.None
+            });
+            if (report.summary.result != BuildResult.Succeeded)
+                throw new Exception("Browser build failed: " + report.summary.result);
+            File.WriteAllText(Path.Combine(directory, ".nojekyll"), string.Empty);
+            Debug.Log("HAUNTER_WEBGL_BUILD_OK " + report.summary.totalSize + " bytes");
         }
 
         public static void RebuildAndBuildWindows()

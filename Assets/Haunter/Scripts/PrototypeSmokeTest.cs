@@ -7,7 +7,7 @@ using UnityEngine.AI;
 
 namespace Haunter
 {
-    /// <summary>Opt-in integration checks in the actual Windows player, including rendered evidence.</summary>
+    /// <summary>Opt-in integration checks in the actual player, including rendered evidence.</summary>
     public sealed class PrototypeSmokeTest : MonoBehaviour
     {
         [Serializable] class Report { public string[] passed; public string[] failed; public string[] errors; }
@@ -25,7 +25,11 @@ namespace Haunter
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Launch()
         {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            if (!BrowserBridge.SmokeRequested) return;
+#else
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "--haunter-smoke") < 0) return;
+#endif
             if (FindFirstObjectByType<PrototypeSmokeTest>()) return;
             DontDestroyOnLoad(new GameObject("Prototype verification").AddComponent<PrototypeSmokeTest>().gameObject);
         }
@@ -33,8 +37,10 @@ namespace Haunter
         void Awake()
         {
             startedAt = Time.realtimeSinceStartup;
+#if !UNITY_WEBGL || UNITY_EDITOR
             evidence = Path.Combine(Path.GetDirectoryName(Application.dataPath), "Evidence");
             Directory.CreateDirectory(evidence);
+#endif
             Application.logMessageReceived += OnLog;
         }
 
@@ -74,7 +80,7 @@ namespace Haunter
             if (creatureAgent.isOnNavMesh) creatureAgent.isStopped = true;
             Check(session.State == SessionState.Ready, "Title screen starts paused");
             yield return Capture("01-title.png");
-            Check(measuredPixels > 100, "Title UI is rendered in the Windows player");
+            Check(measuredPixels > 100, "Title UI is rendered in the player");
             session.Begin();
             NoiseSystem.Heard += TraceNoise;
             yield return new WaitForSeconds(.2f);
@@ -420,7 +426,11 @@ namespace Haunter
             coloredPixels = 0;
             if (screenshot)
             {
+#if UNITY_WEBGL && !UNITY_EDITOR
+                BrowserBridge.RecordScreenshot(filename, Convert.ToBase64String(screenshot.EncodeToPNG()));
+#else
                 File.WriteAllBytes(Path.Combine(evidence, filename), screenshot.EncodeToPNG());
+#endif
                 Color32[] pixels = screenshot.GetPixels32();
                 int w = screenshot.width, h = screenshot.height;
                 // Ignore UI and viewmodel at the right/bottom; count only the room ahead.
@@ -439,10 +449,17 @@ namespace Haunter
         {
             if (finished) return;
             finished = true;
-            File.WriteAllText(Path.Combine(evidence, "smoke-report.json"), JsonUtility.ToJson(new Report
-                { passed = passed.ToArray(), failed = failed.ToArray(), errors = errors.ToArray() }, true));
+            string report = JsonUtility.ToJson(new Report
+                { passed = passed.ToArray(), failed = failed.ToArray(), errors = errors.ToArray() }, true);
+#if UNITY_WEBGL && !UNITY_EDITOR
+            BrowserBridge.RecordSmokeReport(report);
+#else
+            File.WriteAllText(Path.Combine(evidence, "smoke-report.json"), report);
+#endif
             Debug.Log("HAUNTER_SMOKE_FINISHED passed=" + passed.Count + " failed=" + failed.Count + " errors=" + errors.Count);
+#if !UNITY_WEBGL || UNITY_EDITOR
             Application.Quit(failed.Count == 0 && errors.Count == 0 ? 0 : 1);
+#endif
         }
 
         void OnDestroy() { Application.logMessageReceived -= OnLog; NoiseSystem.Heard -= CountImpact; NoiseSystem.Heard -= TraceNoise; }

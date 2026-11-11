@@ -2,18 +2,24 @@
 
 A playable first-person Unity horror concept. Sound is your only sight: footsteps, cane taps, thrown objects and the creature's paws send expanding waves across a black world, briefly revealing white outlines.
 
-**[Download and play for Windows (ZIP)](https://github.com/GraysonWills/haunter-in-the-dark/releases/latest/download/HaunterInTheDark-Windows.zip)** · [Release notes and source downloads](https://github.com/GraysonWills/haunter-in-the-dark/releases/latest)
+**[Play in your browser](https://graysonwills.github.io/haunter-in-the-dark/)** · [Download for Windows](https://github.com/GraysonWills/haunter-in-the-dark/releases/latest/download/HaunterInTheDark-Windows.zip) · [Release notes and source downloads](https://github.com/GraysonWills/haunter-in-the-dark/releases/latest)
 
 ![A cane ripple reveals white outlines across the dark room](docs/evidence/03-cane-ripple.png)
 
-## Play without Unity
+## Play in your browser
+
+Open **[Haunter in the Dark](https://graysonwills.github.io/haunter-in-the-dark/)** in a desktop browser and click **Play**. The game loads directly on the page; no installation or Unity editor is needed. Use a keyboard and mouse, and click the game to capture the mouse. Escape pauses and releases it. The fullscreen button expands the game.
+
+The browser version uses the same Unity scene, echo shaders, creature behavior and controls as the Windows game. It requires WebGL 2 and is designed for desktop play; touch controls are not included. The first load downloads the game into your browser, so allow the loading bar to finish.
+
+## Play on Windows
 
 1. Download **HaunterInTheDark-Windows.zip** using the link above.
 2. Right-click the ZIP and choose **Extract All**.
 3. Open the extracted folder and run **HaunterInTheDark.exe**. Keep it beside its `HaunterInTheDark_Data` folder, `UnityPlayer.dll`, and the other included files.
 4. Press **Enter** to begin. Headphones help locate sounds.
 
-This is a **Windows 64-bit desktop build**; Unity is not needed to play. Browser, macOS and Linux builds are not included. GitHub's **Code → Download ZIP** contains the Unity source project, not the playable Windows build.
+This download is a **Windows 64-bit desktop build**; Unity is not needed to play. GitHub's **Code → Download ZIP** contains the Unity source project, not the playable Windows build.
 
 ## Controls and objective
 
@@ -36,7 +42,7 @@ Version 0.3 reduces hearing and makes distractions reliable: approximately **18 
 
 ## Unity project
 
-1. Clone this repository, or download and extract **HaunterInTheDark-UnityProject.zip** from the [release page](https://github.com/GraysonWills/haunter-in-the-dark/releases/latest).
+1. Clone this repository, or use **Code → Download ZIP** and extract it for the current project, including browser support. The versioned Unity project archive on the release page preserves the original Windows release source.
 2. Install **Unity 2023.1.14f1** through Unity Hub, with **Windows Build Support** available if you want to make a Windows player.
 3. In Unity Hub, choose **Add → Add project from disk** and select the folder containing `Assets`, `Packages`, and `ProjectSettings`.
 4. Open the project with Unity 2023.1.14f1 and let the first import finish. Open `Assets/Haunter/Scenes/HaunterInTheDark.unity`, then press **Play**.
@@ -83,6 +89,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1 -UnityPath "D:\U
 ```
 
 `-ExecutionPolicy Bypass` applies only to that PowerShell process; it does not change your saved execution policy. Build output is logged to `Logs/build.log`.
+
+For a browser build, install the matching **WebGL Build Support** module, then choose **Haunter → Build browser prototype** or run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1 -Target WebGL
+```
+
+Output goes to `Builds/WebGL`. Serve that folder over HTTP rather than opening `index.html` directly. See [browser build and hosting instructions](docs/WEBGL.md).
 
 Run `Test.ps1` to execute the opt-in smoke test in a visible Windows player window (a hidden player returns black screen captures). It writes `Builds/Windows/Evidence/smoke-report.json` and eight screenshots, including darkness, the cane wave, held prop near a wall, creature, and both ending screens. It checks rendering, physics impacts, sound-driven AI, reachability and state transitions. Automated input is isolated from the keyboard. It has a real-time timeout and exits with a nonzero code on failure. The normal game does not run these checks.
 

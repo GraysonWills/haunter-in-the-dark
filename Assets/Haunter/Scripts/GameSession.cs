@@ -46,13 +46,19 @@ namespace Haunter
 
         void Update()
         {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            if (Input.GetKeyDown(KeyCode.F)) Screen.fullScreen = !Screen.fullScreen;
+            if (State == SessionState.Paused && Input.GetKeyDown(KeyCode.Return)) Resume();
+#endif
             if (State == SessionState.Playing)
             {
                 ElapsedSeconds += Time.deltaTime;
                 if (Input.GetKeyDown(KeyCode.Escape)) Pause();
             }
             else if (State == SessionState.Ready && Input.GetKeyDown(KeyCode.Return)) Begin();
+#if !UNITY_WEBGL || UNITY_EDITOR
             else if (State == SessionState.Paused && Input.GetKeyDown(KeyCode.Escape)) Resume();
+#endif
             else if ((State == SessionState.Caught || State == SessionState.Escaped) && Input.GetKeyDown(KeyCode.R)) Restart();
         }
 
@@ -116,6 +122,9 @@ namespace Haunter
         {
             Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
             Cursor.visible = !locked;
+#if UNITY_WEBGL && !UNITY_EDITOR
+            if (locked) BrowserBridge.NotifyPointerLockRequest();
+#endif
         }
 
         void OnNoise(NoiseEvent noise)
@@ -257,7 +266,11 @@ namespace Haunter
             Text(new Rect(110, 160, 650, 30), "TAKE A BREATH", label, .5f);
             GUI.Label(new Rect(103, 235, 900, 115), "PAUSED", title);
             GUI.Label(new Rect(112, 377, 700, 60), "The dark can wait.", body);
+#if UNITY_WEBGL && !UNITY_EDITOR
+            if (DrawButton(new Rect(110, 490, 330, 60), "RESUME     /     ENTER")) Resume();
+#else
             if (DrawButton(new Rect(110, 490, 330, 60), "RESUME     /     ESC")) Resume();
+#endif
             if (DrawButton(new Rect(110, 575, 330, 60), "START AGAIN")) Restart();
             DrawEchoArtwork(new Vector2(1180, 460));
             Text(new Rect(110, 775, 900, 30), "SPACE / RMB  CANE     E  PICK UP     HOLD LMB  THROW     Q  DROP", small, .55f);
@@ -290,6 +303,14 @@ namespace Haunter
         bool DrawButton(Rect rect, string text)
         {
             Fill(new Rect(rect.x - 1, rect.y - 1, rect.width + 2, rect.height + 2), .65f);
+#if UNITY_WEBGL && !UNITY_EDITOR
+            // Request pointer lock on press so Unity can complete it on the browser's mouse-up event.
+            if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && rect.Contains(Event.current.mousePosition))
+            {
+                Event.current.Use();
+                return true;
+            }
+#endif
             return GUI.Button(rect, text, button);
         }
 

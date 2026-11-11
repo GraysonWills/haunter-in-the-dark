@@ -38,6 +38,10 @@ Alt+F4                    Close the game
 This is a single-room prototype with primitive art and procedural sound.
 This download is for Windows desktop, not a browser, macOS, or Linux.
 
+PLAY IN A BROWSER
+https://graysonwills.github.io/haunter-in-the-dark/
+Use a desktop browser with a keyboard and mouse. No installation needed.
+
 SOURCE, UPDATES, AND BUILD INSTRUCTIONS
 https://github.com/GraysonWills/haunter-in-the-dark
 
