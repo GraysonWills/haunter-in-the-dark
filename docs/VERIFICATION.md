@@ -24,6 +24,8 @@ Separate Chromium input checks verified starting with Enter, mouse capture and c
 
 Chromium emits six WebGL format-capability probe warnings during Unity startup; rendering checks pass and no console errors were recorded. Browser validation was performed on Windows in Chromium; mobile touch controls and cross-browser/platform testing remain outside this prototype's verification.
 
+After remapping browser crouch to Shift/C and sprint to R, focused Chromium input checks confirmed actual movement with Left Shift + W, Right Shift + W, C + W, and R + W. Holding crouch and sprint together remained quiet, releasing the keys returned to walking, and the tab stayed open. Title and pause screenshots confirmed the matching control hints. Native Windows bindings remain unchanged.
+
 ## Limits
 
 This is a one-room prototype with procedural placeholder models/audio. Automated checks cover the core loop but do not replace a full player-driven balance test. Mouse look, movement, crouching and charged throws should receive more playtesting before expanding the level. No validation was performed on macOS, Linux, mobile, URP or HDRP.

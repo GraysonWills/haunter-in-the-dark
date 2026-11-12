@@ -197,9 +197,9 @@ namespace Haunter
             GUI.Label(new Rect(112, 427, 640, 100), "Every sound shows you the room.\nEvery sound tells it where to look.", body);
             Text(new Rect(112, 535, 640, 28), "It guards the exit. Draw it away, then slip past.", label, .72f);
             if (DrawButton(new Rect(110, 613, 330, 60), "ENTER THE DARK     /     ENTER")) Begin();
-            Text(new Rect(110, 724, 650, 25), "WASD   MOVE       MOUSE   LOOK       CTRL   CROUCH", small, .65f);
+            Text(new Rect(110, 724, 750, 25), "WASD   MOVE       MOUSE   LOOK       " + PlayerController.CrouchKeys + "   CROUCH", small, .65f);
             Text(new Rect(110, 753, 700, 25), "SPACE / RMB   TAP CANE       E   PICK UP       HOLD LMB   THROW", small, .65f);
-            Text(new Rect(110, 782, 700, 25), "Q   DROP       SHIFT   RUN       ESC   PAUSE", small, .5f);
+            Text(new Rect(110, 782, 700, 25), "Q   DROP       " + PlayerController.SprintKeys + "   RUN       ESC   PAUSE", small, .5f);
             Fill(new Rect(110, 847, 1380, 1), .15f);
             Text(new Rect(110, 863, 700, 20), "A FICTIONAL ECHOLOCATION HORROR CONCEPT", small, .4f);
             Text(new Rect(1320, 863, 250, 20), "HEADPHONES ADVISED", small, .4f);
@@ -244,7 +244,7 @@ namespace Haunter
                 Text(new Rect(63, 815, 250, 22), "SPACE / RMB   TAP CANE", label, .8f);
                 Fill(new Rect(63, 846, 202, 2), .18f);
                 Fill(new Rect(63, 846, 202 * Player.CaneReady, 2), .65f);
-                string movement = Player.IsCrouching ? "CROUCHING / QUIET" : Player.IsSprinting ? "RUNNING / LOUD" : "CTRL  CROUCH";
+                string movement = Player.IsCrouching ? "CROUCHING / QUIET" : Player.IsSprinting ? "RUNNING / LOUD" : PlayerController.CrouchKeys + "  CROUCH";
                 Text(new Rect(50, 873, 320, 20), movement, small, .45f);
             }
             float soundFade = Mathf.Clamp01(1f - (Time.time - lastNoiseAt) / 2.5f);
@@ -274,7 +274,7 @@ namespace Haunter
             if (DrawButton(new Rect(110, 575, 330, 60), "START AGAIN")) Restart();
             DrawEchoArtwork(new Vector2(1180, 460));
             Text(new Rect(110, 775, 900, 30), "SPACE / RMB  CANE     E  PICK UP     HOLD LMB  THROW     Q  DROP", small, .55f);
-            Text(new Rect(110, 811, 900, 30), "WASD  MOVE     CTRL  CROUCH     SHIFT  RUN     MOUSE  LOOK", small, .55f);
+            Text(new Rect(110, 811, 1000, 30), "WASD  MOVE     " + PlayerController.CrouchKeys + "  CROUCH     " + PlayerController.SprintKeys + "  RUN     MOUSE  LOOK", small, .55f);
         }
 
         void DrawOutcome()

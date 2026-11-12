@@ -10,7 +10,7 @@ A playable first-person Unity horror concept. Sound is your only sight: footstep
 
 Open **[Haunter in the Dark](https://graysonwills.github.io/haunter-in-the-dark/)** in a desktop browser and click **Play**. The game loads directly on the page; no installation or Unity editor is needed. Use a keyboard and mouse, and click the game to capture the mouse. Escape pauses and releases it. The fullscreen button expands the game.
 
-The browser version uses the same Unity scene, echo shaders, creature behavior and controls as the Windows game. It requires WebGL 2 and is designed for desktop play; touch controls are not included. The first load downloads the game into your browser, so allow the loading bar to finish.
+The browser version uses the same Unity scene, echo shaders and creature behavior as the Windows game, with separate crouch and sprint keys to avoid browser shortcuts. It requires WebGL 2 and is designed for desktop play; touch controls are not included. The first load downloads the game into your browser, so allow the loading bar to finish.
 
 ## Play on Windows
 
@@ -23,18 +23,20 @@ This download is a **Windows 64-bit desktop build**; Unity is not needed to play
 
 ## Controls and objective
 
-| Control | Action |
-|---|---|
-| WASD / mouse | Move / look |
-| Space or right mouse | Tap your cane |
-| Ctrl or C | Crouch and move quietly |
-| Shift | Run, making louder footsteps |
-| E | Pick up the object under the crosshair / use the exit |
-| Hold and release left mouse | Charge and throw the held object |
-| Q | Drop the held object |
-| Esc | Pause / resume and release the cursor |
-| R after an ending | Restart |
-| Alt+F4 | Close the game |
+| Action | Browser | Windows |
+|---|---|---|
+| Move / look | WASD / mouse | WASD / mouse |
+| Tap your cane | Space or right mouse | Space or right mouse |
+| Crouch and move quietly | Hold either Shift key or C | Hold Ctrl or C |
+| Sprint with louder footsteps | Hold R | Hold Shift |
+| Pick up an object / use the exit | E | E |
+| Charge and throw the held object | Hold and release left mouse | Hold and release left mouse |
+| Drop the held object | Q | Q |
+| Pause and release the cursor | Esc | Esc |
+| Resume | Enter or click Resume | Esc or click Resume |
+| Restart after an ending | R | R |
+
+In the browser, **Shift + W** moves forward quietly and **R + W** sprints. Ctrl is not a browser movement binding, so crouching does not require the Ctrl + W tab-closing shortcut. Close the browser tab to leave the web game, or use Alt + F4 for the Windows player.
 
 The arrow at the top points toward the exit. The creature guards that door and runs faster than your sprint. Crouching reduces how far it hears your steps. A nearby thrown-object impact can interrupt its pursuit of you. Once distracted, it commits to that impact area, reaches it, and investigates for **five full seconds** before returning to the exit. Footsteps, cane taps, other objects and repeated bounces cannot redirect it or restart that timer during the approach or linger. Its own paw sounds reveal the room without attracting it to itself. There are 32 cans, bottles and stones; held props keep their outlines visible.
 

@@ -41,6 +41,8 @@ This download is for Windows desktop, not a browser, macOS, or Linux.
 PLAY IN A BROWSER
 https://graysonwills.github.io/haunter-in-the-dark/
 Use a desktop browser with a keyboard and mouse. No installation needed.
+Browser controls differ: hold Shift or C to crouch, and hold R to sprint.
+Shift + W moves forward quietly. The Windows controls above are unchanged.
 
 SOURCE, UPDATES, AND BUILD INSTRUCTIONS
 https://github.com/GraysonWills/haunter-in-the-dark

@@ -26,6 +26,8 @@ This repository's live GitHub Pages site publishes from the root of the `codex/p
 
 Click **Play** to load the game, then use the game's start button or Enter. A click on the canvas captures the mouse. Escape pauses and releases it; click Resume to continue. Audio starts after interaction with the page. Fullscreen is available from the page button.
 
+Use WASD to move. Hold **either Shift key or C** to crouch, and hold **R** to sprint. **Shift + W** moves forward quietly; **R + W** runs forward. These browser bindings avoid the Ctrl + W tab-closing shortcut. Crouching takes priority if both crouch and sprint are held. R still restarts the game after an ending. The Windows player retains Ctrl/C for crouching and Shift for sprinting.
+
 The game needs WebGL 2 and a keyboard/mouse. Mobile touch controls are not included. The Windows download remains available from the repository's release page.
 
 ## Diagnostics

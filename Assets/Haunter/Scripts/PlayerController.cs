@@ -6,6 +6,13 @@ namespace Haunter
     [RequireComponent(typeof(CharacterController))]
     public sealed class PlayerController : MonoBehaviour
     {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        public const string CrouchKeys = "SHIFT / C";
+        public const string SprintKeys = "R";
+#else
+        public const string CrouchKeys = "CTRL / C";
+        public const string SprintKeys = "SHIFT";
+#endif
         [Header("Movement")]
         public float WalkSpeed = 2.8f;
         public float CrouchSpeed = 1.35f;
@@ -115,11 +122,18 @@ namespace Haunter
 
         void Move()
         {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            // Ctrl + movement keys can trigger browser shortcuts such as closing the tab.
+            bool crouchRequested = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) || Input.GetKey(KeyCode.C);
+            bool sprintRequested = Input.GetKey(KeyCode.R);
+#else
             bool crouchRequested = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C);
+            bool sprintRequested = Input.GetKey(KeyCode.LeftShift);
+#endif
             bool blockedAbove = IsCrouching && Physics.SphereCast(transform.position + Vector3.up * .9f,
                 .29f, Vector3.up, out _, .6f, ~(1 << 9), QueryTriggerInteraction.Ignore);
             IsCrouching = crouchRequested || blockedAbove;
-            IsSprinting = !IsCrouching && Input.GetKey(KeyCode.LeftShift);
+            IsSprinting = !IsCrouching && sprintRequested;
             float height = IsCrouching ? 1.15f : 1.8f;
             controller.height = height;
             controller.center = Vector3.up * height * .5f;
