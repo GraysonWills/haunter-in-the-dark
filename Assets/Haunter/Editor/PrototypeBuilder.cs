@@ -46,7 +46,7 @@ namespace Haunter.Editor
         {
             PlayerSettings.companyName = "Haunter Prototype";
             PlayerSettings.productName = "Haunter in the Dark";
-            PlayerSettings.bundleVersion = "0.3.0";
+            PlayerSettings.bundleVersion = "0.4.0";
             PlayerSettings.defaultScreenWidth = 1280;
             PlayerSettings.defaultScreenHeight = 720;
             PlayerSettings.fullScreenMode = FullScreenMode.Windowed;

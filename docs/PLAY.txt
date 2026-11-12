@@ -1,4 +1,4 @@
-HAUNTER IN THE DARK - v0.3.0
+HAUNTER IN THE DARK - v0.4.0
 Windows 64-bit prototype
 
 GET STARTED
@@ -23,6 +23,19 @@ seconds before returning to the exit. New sounds cannot redirect it or
 extend that investigation. Use the opening to sneak past, but avoid
 touching the creature even while it is distracted.
 
+GUIDED OPENING
+The new tutorial teaches you during the encounter: tap the cane, watch
+the creature by the exit, and take two steps. When it charges, time
+freezes. Press E to pick up the highlighted object, then hold and release
+left mouse to throw where the camera aims. Watch it investigate, then
+hold Ctrl or C and move quietly as it returns to the exit.
+
+The camera and movement are locked during the pickup and throw lessons.
+Take as long as you need; pausing preserves the frozen step. The tutorial
+restarts with each new run, including after death. Press T to skip it, or
+use Play without tutorial on the title screen / Skip tutorial & resume
+on the pause screen. The character's reaction is shown as a caption.
+
 CONTROLS
 WASD / mouse              Move / look
 Space or right mouse      Tap your cane
@@ -33,6 +46,7 @@ Hold/release left mouse   Charge and throw the held object
 Q                         Drop the held object
 Esc                       Pause / resume and release the cursor
 R after an ending         Restart
+T                         Skip the guided opening
 Alt+F4                    Close the game
 
 This is a single-room prototype with primitive art and procedural sound.

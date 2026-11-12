@@ -51,7 +51,7 @@ Version 0.3 reduces hearing and makes distractions reliable: approximately **18 
 
 ## Unity project
 
-1. Clone this repository, or use **Code → Download ZIP** and extract it for the current project, including browser support. The versioned Unity project archive on the release page preserves the original Windows release source.
+1. Clone this repository, or use **Code → Download ZIP** and extract it for the current project, including browser support. Each release's Unity project archive contains the source used for its Windows download.
 2. Install **Unity 2023.1.14f1** through Unity Hub, with **Windows Build Support** available if you want to make a Windows player.
 3. In Unity Hub, choose **Add → Add project from disk** and select the folder containing `Assets`, `Packages`, and `ProjectSettings`.
 4. Open the project with Unity 2023.1.14f1 and let the first import finish. Open `Assets/Haunter/Scenes/HaunterInTheDark.unity`, then press **Play**.
