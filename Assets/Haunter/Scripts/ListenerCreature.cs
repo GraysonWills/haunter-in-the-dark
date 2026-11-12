@@ -33,6 +33,9 @@ namespace Haunter
         public bool IsReturningToExit => mode == Behavior.Returning;
         public bool IsGuardingExit => mode == Behavior.Guarding;
         public int TotalPawsteps { get; private set; }
+        public bool TutorialHold { get; set; }
+        public bool TutorialHearingSuppressed { get; set; }
+        public GameObject TutorialImpactSource { get; set; }
 
         enum Behavior { Guarding, Investigating, DistractionApproach, DistractionLinger, Returning }
         Behavior mode;
@@ -149,8 +152,39 @@ namespace Haunter
             return 0f;
         }
 
+        public void CueTutorialPaw()
+        {
+            Pawfall(pawOrder[nextPaw++ % 4], .62f);
+        }
+
+        public bool BeginTutorialPursuit(Vector3 target)
+        {
+            if (agent == null || !agent.isOnNavMesh || !TrySoundPath(target, out var path)) return false;
+            TargetPosition = target;
+            mode = Behavior.Investigating;
+            RemainingSteps = 100;
+            listenRemaining = 0;
+            pawClock = 0;
+            stalledTime = 0;
+            idleClock = 0;
+            agent.speed = movementSpeed;
+            agent.SetPath(path);
+            agent.isStopped = false;
+            return true;
+        }
+
+        public void ReleaseTutorialControl(bool returnToExit)
+        {
+            TutorialHold = false;
+            TutorialHearingSuppressed = false;
+            TutorialImpactSource = null;
+            if (returnToExit && agent != null && agent.isOnNavMesh) ReturnToExit();
+        }
+
         private void Hear(NoiseEvent noise)
         {
+            if (TutorialImpactSource != null && (noise.Kind != NoiseKind.Impact || noise.Source != TutorialImpactSource)) return;
+            if (TutorialHold || TutorialHearingSuppressed) return;
             if (GameSession.Instance == null || GameSession.Instance.State != SessionState.Playing) return;
             if (noise.Kind == NoiseKind.Creature || noise.Kind == NoiseKind.Intro) return;
             if (noise.Source == gameObject || (noise.Source != null && noise.Source.transform.IsChildOf(transform))) return;
@@ -210,6 +244,11 @@ namespace Haunter
         private void Update()
         {
             if (agent == null || !agent.isOnNavMesh) return;
+            if (TutorialHold || Time.timeScale <= 0f)
+            {
+                agent.isStopped = true;
+                return;
+            }
             if (GameSession.Instance == null || GameSession.Instance.State != SessionState.Playing)
             {
                 agent.isStopped = true;

@@ -2,9 +2,12 @@ mergeInto(LibraryManager.library, {
   Haunter_SmokeRequested: function () {
     return new URLSearchParams(window.location.search).get("smoke") === "1" ? 1 : 0;
   },
+  Haunter_TutorialSmokeRequested: function () {
+    return new URLSearchParams(window.location.search).get("tutorialSmoke") === "1" ? 1 : 0;
+  },
   Haunter_DiagnosticsRequested: function () {
     var query = new URLSearchParams(window.location.search);
-    return query.get("debug") === "1" || query.get("smoke") === "1" ? 1 : 0;
+    return query.get("debug") === "1" || query.get("smoke") === "1" || query.get("tutorialSmoke") === "1" ? 1 : 0;
   },
   Haunter_HasPointerLock: function () {
     return document.pointerLockElement === Module.canvas ? 1 : 0;
@@ -31,5 +34,14 @@ mergeInto(LibraryManager.library, {
   },
   Haunter_RecordSmokeReport: function (json) {
     window.haunterSmokeReport = JSON.parse(UTF8ToString(json));
+    // Opt-in test pages expose their result in the DOM as well as the diagnostic API.
+    var report = document.getElementById("haunter-test-report");
+    if (!report) {
+      report = document.createElement("pre");
+      report.id = "haunter-test-report";
+      report.style.cssText = "white-space:pre-wrap;color:white;background:black;padding:24px;position:relative;z-index:20";
+      document.body.appendChild(report);
+    }
+    report.textContent = JSON.stringify(window.haunterSmokeReport, null, 2);
   }
 });

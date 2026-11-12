@@ -12,11 +12,13 @@ namespace Haunter
         public PlayerController Player;
         public Transform Exit;
         public ListenerCreature Creature;
+        public TutorialDirector Tutorial { get; private set; }
         public SessionState State { get; private set; } = SessionState.Ready;
         public float ElapsedSeconds { get; private set; }
         public int SoundsMade { get; private set; }
 
         GUIStyle title, subtitle, label, small, body, button, centered, objective, numeral;
+        GUIStyle tutorialHeading, tutorialCopy;
         float lastLoudness;
         float lastNoiseAt = -10f;
         string lastSound = "SILENCE";
@@ -26,6 +28,8 @@ namespace Haunter
         void Awake()
         {
             Instance = this;
+            Tutorial = GetComponent<TutorialDirector>();
+            if (Tutorial == null) Tutorial = gameObject.AddComponent<TutorialDirector>();
             State = SessionState.Ready;
             Time.timeScale = 0f;
             SetCursor(false);
@@ -62,12 +66,14 @@ namespace Haunter
             else if ((State == SessionState.Caught || State == SessionState.Escaped) && Input.GetKeyDown(KeyCode.R)) Restart();
         }
 
-        public void Begin()
+        public void Begin(bool skipTutorial = false)
         {
             if (State != SessionState.Ready) return;
             State = SessionState.Playing;
             Time.timeScale = 1f;
             SetCursor(true);
+            if (skipTutorial) Tutorial.Skip();
+            else Tutorial.StartTutorial();
             if (Player != null) NoiseSystem.Emit(Player.transform.position + Vector3.up * .03f, 1.1f, NoiseKind.Intro, Player.gameObject);
         }
 
@@ -99,7 +105,7 @@ namespace Haunter
         {
             if (State != SessionState.Paused) return;
             State = SessionState.Playing;
-            Time.timeScale = 1f;
+            Time.timeScale = Tutorial != null && Tutorial.WorldFrozen ? 0f : 1f;
             SetCursor(true);
         }
 
@@ -114,7 +120,7 @@ namespace Haunter
 
         void OnApplicationFocus(bool focused)
         {
-            if (FindFirstObjectByType<PrototypeSmokeTest>() != null) return;
+            if (FindFirstObjectByType<PrototypeSmokeTest>() != null || FindFirstObjectByType<TutorialSmokeTest>() != null) return;
             if (!focused && State == SessionState.Playing) Pause();
         }
 
@@ -150,6 +156,12 @@ namespace Haunter
             body.normal.textColor = new Color(.68f, .68f, .68f);
             centered = Style(font, 16, FontStyle.Normal);
             centered.alignment = TextAnchor.MiddleCenter;
+            centered.wordWrap = true;
+            tutorialHeading = Style(font, 24, FontStyle.Bold);
+            tutorialHeading.alignment = TextAnchor.MiddleCenter;
+            tutorialCopy = Style(font, 21, FontStyle.Normal);
+            tutorialCopy.alignment = TextAnchor.MiddleCenter;
+            tutorialCopy.wordWrap = true;
             objective = Style(font, 17, FontStyle.Bold);
             objective.alignment = TextAnchor.MiddleCenter;
             numeral = Style(font, 38, FontStyle.Normal);
@@ -197,6 +209,7 @@ namespace Haunter
             GUI.Label(new Rect(112, 427, 640, 100), "Every sound shows you the room.\nEvery sound tells it where to look.", body);
             Text(new Rect(112, 535, 640, 28), "It guards the exit. Draw it away, then slip past.", label, .72f);
             if (DrawButton(new Rect(110, 613, 330, 60), "ENTER THE DARK     /     ENTER")) Begin();
+            if (DrawButton(new Rect(110, 684, 330, 32), "PLAY WITHOUT TUTORIAL")) Begin(true);
             Text(new Rect(110, 724, 750, 25), "WASD   MOVE       MOUSE   LOOK       " + PlayerController.CrouchKeys + "   CROUCH", small, .65f);
             Text(new Rect(110, 753, 700, 25), "SPACE / RMB   TAP CANE       E   PICK UP       HOLD LMB   THROW", small, .65f);
             Text(new Rect(110, 782, 700, 25), "Q   DROP       " + PlayerController.SprintKeys + "   RUN       ESC   PAUSE", small, .5f);
@@ -229,7 +242,7 @@ namespace Haunter
                 if (Player.HeldObject != null) prompt = "HOLD LMB  THROW " + Player.HeldObject.DisplayName.ToUpperInvariant() + "     /     Q  DROP";
                 else if (Player.NearbyObject != null) prompt = "E  PICK UP " + Player.NearbyObject.DisplayName.ToUpperInvariant();
                 else if (Exit != null && PlayerController.HorizontalDistance(Player.transform.position, Exit.position) < 2.2f) prompt = "E  LEAVE THE ARCHIVE";
-                if (!string.IsNullOrEmpty(prompt))
+                if (!string.IsNullOrEmpty(prompt) && (Tutorial == null || !Tutorial.Active))
                 {
                     Fill(new Rect(500, 526, 600, 45), .72f, false);
                     GUI.Label(new Rect(500, 526, 600, 45), prompt, centered);
@@ -240,10 +253,13 @@ namespace Haunter
                     Fill(new Rect(700, 590, 200 * Player.ThrowCharge, 2), .95f);
                     Text(new Rect(700, 605, 200, 25), "RELEASE TO THROW", centered, .65f);
                 }
-                Fill(new Rect(50, 806, 240, 50), .65f, false);
-                Text(new Rect(63, 815, 250, 22), "SPACE / RMB   TAP CANE", label, .8f);
-                Fill(new Rect(63, 846, 202, 2), .18f);
-                Fill(new Rect(63, 846, 202 * Player.CaneReady, 2), .65f);
+                if (Tutorial == null || !Tutorial.Active || Tutorial.Stage == TutorialStage.TapCane)
+                {
+                    Fill(new Rect(50, 806, 240, 50), .65f, false);
+                    Text(new Rect(63, 815, 250, 22), "SPACE / RMB   TAP CANE", label, .8f);
+                    Fill(new Rect(63, 846, 202, 2), .18f);
+                    Fill(new Rect(63, 846, 202 * Player.CaneReady, 2), .65f);
+                }
                 string movement = Player.IsCrouching ? "CROUCHING / QUIET" : Player.IsSprinting ? "RUNNING / LOUD" : PlayerController.CrouchKeys + "  CROUCH";
                 Text(new Rect(50, 873, 320, 20), movement, small, .45f);
             }
@@ -255,8 +271,29 @@ namespace Haunter
                 float alpha = i < lastLoudness / 1.5f * 18 ? .12f + soundFade * .6f : .1f;
                 Fill(new Rect(1277 + i * 14, 866 - height, 6, height), alpha);
             }
-            if (ElapsedSeconds < 12)
+            if (Tutorial != null && Tutorial.Active) DrawTutorial();
+            else if (ElapsedSeconds < 12)
                 Text(new Rect(480, 830, 640, 35), "Throw to distract it. It will linger there. Crouch past.", centered, Mathf.Clamp01((12f - ElapsedSeconds) / 2f) * .65f);
+        }
+
+        void DrawTutorial()
+        {
+            Fill(new Rect(330, 650, 940, 137), .94f, false);
+            Fill(new Rect(330, 650, 940, 1), .38f);
+            Text(new Rect(350, 663, 900, 22), Tutorial.WorldFrozen ? "GUIDED OPENING  /  TIME FROZEN" : "GUIDED OPENING", centered, .48f);
+            GUI.Label(new Rect(350, 692, 900, 28), Tutorial.Heading, tutorialHeading);
+            Text(new Rect(360, 730, 880, 45), Tutorial.Instruction, tutorialCopy, .92f);
+            Text(new Rect(1330, 35, 240, 28), "T  SKIP TUTORIAL", small, .65f);
+            if (Tutorial.Stage == TutorialStage.Throw || Tutorial.Stage == TutorialStage.FocusThrow)
+            {
+                Vector3 target = Player.ViewCamera.WorldToViewportPoint(Tutorial.ThrowTarget);
+                if (target.z > 0)
+                {
+                    Vector2 point = new Vector2(target.x * Width, (1f - target.y) * Height);
+                    DrawCrosshair(point);
+                    Text(new Rect(point.x - 100, point.y - 45, 200, 25), "THROW HERE", centered, .9f);
+                }
+            }
         }
 
         void DrawPause()
@@ -272,6 +309,11 @@ namespace Haunter
             if (DrawButton(new Rect(110, 490, 330, 60), "RESUME     /     ESC")) Resume();
 #endif
             if (DrawButton(new Rect(110, 575, 330, 60), "START AGAIN")) Restart();
+            if (Tutorial != null && Tutorial.Active && DrawButton(new Rect(110, 660, 330, 60), "SKIP TUTORIAL & RESUME"))
+            {
+                Tutorial.Skip();
+                Resume();
+            }
             DrawEchoArtwork(new Vector2(1180, 460));
             Text(new Rect(110, 775, 900, 30), "SPACE / RMB  CANE     E  PICK UP     HOLD LMB  THROW     Q  DROP", small, .55f);
             Text(new Rect(110, 811, 1000, 30), "WASD  MOVE     " + PlayerController.CrouchKeys + "  CROUCH     " + PlayerController.SprintKeys + "  RUN     MOUSE  LOOK", small, .55f);

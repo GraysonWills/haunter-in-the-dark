@@ -36,6 +36,8 @@ namespace Haunter
 
         void Awake()
         {
+            QualitySettings.vSyncCount = 0;
+            Application.targetFrameRate = 60;
             startedAt = Time.realtimeSinceStartup;
 #if !UNITY_WEBGL || UNITY_EDITOR
             evidence = Path.Combine(Path.GetDirectoryName(Application.dataPath), "Evidence");
@@ -81,7 +83,7 @@ namespace Haunter
             Check(session.State == SessionState.Ready, "Title screen starts paused");
             yield return Capture("01-title.png");
             Check(measuredPixels > 100, "Title UI is rendered in the player");
-            session.Begin();
+            session.Begin(true);
             NoiseSystem.Heard += TraceNoise;
             yield return new WaitForSeconds(.2f);
             Check(session.State == SessionState.Playing, "Begin enters gameplay");
@@ -313,7 +315,7 @@ namespace Haunter
             session = GameSession.Instance;
             Check(session && session.State == SessionState.Ready, "Restart restores clean title state");
             if (!session) { Finish(); yield break; }
-            session.Begin();
+            session.Begin(true);
             session.Player.AcceptInput = false;
             yield return null;
             controller = session.Player.GetComponent<CharacterController>();

@@ -32,4 +32,4 @@ The game needs WebGL 2 and a keyboard/mouse. Mobile touch controls are not inclu
 
 ## Diagnostics
 
-Append `?debug=1` to expose read-only game state at `window.haunterState` and `window.render_game_to_text()`. Append `?smoke=1` to run the opt-in integration checks in the actual WebGL player. The final report is available at `window.haunterSmokeReport` and in the browser console. Normal visits do not run the test sequence.
+Append `?debug=1` to expose read-only game state at `window.haunterState` and `window.render_game_to_text()`, including the tutorial stage and freeze state. Append `?smoke=1` to run the gameplay/rendering checks, or `?tutorialSmoke=1` to exercise the guided opening in the actual WebGL player. Click **Play in browser** to start the selected suite. Its final report appears below the game and is available at `window.haunterSmokeReport` and in the browser console. Normal visits do not run either test sequence.

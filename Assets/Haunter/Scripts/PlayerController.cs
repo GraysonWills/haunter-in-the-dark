@@ -41,6 +41,9 @@ namespace Haunter
         public bool IsSprinting { get; private set; }
         public bool ChargingThrow { get; private set; }
         public float CaneReady { get { return Mathf.Clamp01((Time.time - lastTap) / CaneCooldown); } }
+        TutorialDirector Tutorial => GameSession.Instance != null ? GameSession.Instance.Tutorial : null;
+        public PlayerActions AllowedActions => Tutorial != null ? Tutorial.Actions : PlayerActions.All;
+        bool Allows(PlayerActions action) => (AllowedActions & action) != 0;
 
         CharacterController controller;
         [SerializeField] Transform handAnchor;
@@ -105,7 +108,7 @@ namespace Haunter
             }
             if (AcceptInput)
             {
-                Look();
+                if (Allows(PlayerActions.Look)) Look();
                 Move();
                 Interact();
             }
@@ -130,6 +133,14 @@ namespace Haunter
             bool crouchRequested = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C);
             bool sprintRequested = Input.GetKey(KeyCode.LeftShift);
 #endif
+            ApplyMovement(new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")), crouchRequested, sprintRequested);
+        }
+
+        public void ApplyMovement(Vector2 moveInput, bool crouchRequested, bool sprintRequested)
+        {
+            if (!Allows(PlayerActions.Move) || GameSession.Instance == null || GameSession.Instance.State != SessionState.Playing) return;
+            crouchRequested &= Allows(PlayerActions.Crouch);
+            sprintRequested &= Allows(PlayerActions.Sprint);
             bool blockedAbove = IsCrouching && Physics.SphereCast(transform.position + Vector3.up * .9f,
                 .29f, Vector3.up, out _, .6f, ~(1 << 9), QueryTriggerInteraction.Ignore);
             IsCrouching = crouchRequested || blockedAbove;
@@ -137,7 +148,7 @@ namespace Haunter
             float height = IsCrouching ? 1.15f : 1.8f;
             controller.height = height;
             controller.center = Vector3.up * height * .5f;
-            Vector2 moveInput = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
+            if (Tutorial != null && Tutorial.RequiresCrouch && !IsCrouching) moveInput = Vector2.zero;
             moveInput = Vector2.ClampMagnitude(moveInput, 1f);
             float speed = IsCrouching ? CrouchSpeed : IsSprinting ? SprintSpeed : WalkSpeed;
             Vector3 movement = (transform.right * moveInput.x + transform.forward * moveInput.y) * speed;
@@ -149,7 +160,7 @@ namespace Haunter
             Vector3 displacement = transform.position - oldPosition;
             displacement.y = 0f;
             float travelled = displacement.magnitude;
-            if (controller.isGrounded && travelled > .001f)
+            if (controller.isGrounded && travelled > .000001f)
             {
                 walkedDistance += travelled;
                 gait += travelled * (IsCrouching ? 5f : 6.5f);
@@ -178,8 +189,8 @@ namespace Haunter
             }
             if (Input.GetKeyDown(KeyCode.E))
             {
-                if (HeldObject == null && NearbyObject != null) PickUp(NearbyObject);
-                else if (GameSession.Instance.Exit != null && HorizontalDistance(transform.position, GameSession.Instance.Exit.position) < 1.9f)
+                if (Allows(PlayerActions.Pickup) && HeldObject == null && NearbyObject != null) PickUp(NearbyObject);
+                else if (Allows(PlayerActions.Exit) && GameSession.Instance.Exit != null && HorizontalDistance(transform.position, GameSession.Instance.Exit.position) < 1.9f)
                     GameSession.Instance.Escape();
             }
             if (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(1)) TapCane();
@@ -189,13 +200,14 @@ namespace Haunter
                 ThrowCharge = 0f;
                 return;
             }
+            if (!Allows(PlayerActions.Throw)) { CancelThrow(); return; }
             if (Input.GetKeyDown(KeyCode.Q))
             {
                 DropHeld();
                 return;
             }
-            if (Input.GetMouseButtonDown(0)) { ChargingThrow = true; chargeStart = Time.time; }
-            if (ChargingThrow) ThrowCharge = Mathf.Clamp01((Time.time - chargeStart) / .8f);
+            if (Input.GetMouseButtonDown(0)) { ChargingThrow = true; chargeStart = Time.unscaledTime; }
+            if (ChargingThrow) ThrowCharge = Mathf.Clamp01((Time.unscaledTime - chargeStart) / .8f);
             if (ChargingThrow && Input.GetMouseButtonUp(0))
             {
                 Vector3 direction = (ViewCamera.transform.forward + Vector3.up * .14f).normalized;
@@ -205,6 +217,7 @@ namespace Haunter
 
         public void PickUp(ThrowableObject item)
         {
+            if (!Allows(PlayerActions.Pickup) || (Tutorial != null && Tutorial.Active && item != Tutorial.TargetObject)) return;
             if (item == null || HeldObject != null || item.IsHeld || handAnchor == null) return;
             handScale = 1f;
             handAnchor.localScale = Vector3.one;
@@ -218,16 +231,20 @@ namespace Haunter
 
         public void ThrowHeld(Vector3 velocity)
         {
+            if (!Allows(PlayerActions.Throw)) return;
             ThrowableObject item = HeldObject;
             if (item == null) return;
+            if (Tutorial != null && Tutorial.Stage == TutorialStage.Throw) velocity = Tutorial.GetThrowVelocity();
             item.Throw(velocity);
             if (!item.IsHeld) HeldObject = null;
             ChargingThrow = false;
             ThrowCharge = 0f;
+            if (Tutorial != null) Tutorial.NotifyThrown(item);
         }
 
         public void DropHeld()
         {
+            if (!Allows(PlayerActions.Drop)) return;
             ThrowableObject item = HeldObject;
             if (item == null) return;
             item.Drop();
@@ -238,6 +255,7 @@ namespace Haunter
 
         public void TapCane()
         {
+            if (!Allows(PlayerActions.Cane)) return;
             if (Time.time - lastTap < CaneCooldown) return;
             lastTap = Time.time;
             tapAnimation = 1f;
@@ -246,6 +264,25 @@ namespace Haunter
             if (Physics.Raycast(transform.position + Vector3.up * .2f, transform.forward,
                 out RaycastHit hit, .7f, ~(1 << 9), QueryTriggerInteraction.Ignore)) tapPoint = hit.point;
             NoiseSystem.Emit(tapPoint, .9f, NoiseKind.Cane, gameObject);
+        }
+
+        public void CancelThrow()
+        {
+            ChargingThrow = false;
+            ThrowCharge = 0f;
+        }
+
+        public void GuideLookAt(Vector3 point, float blend)
+        {
+            if (ViewCamera == null) return;
+            Vector3 direction = point - ViewCamera.transform.position;
+            float horizontal = new Vector2(direction.x, direction.z).magnitude;
+            if (direction.sqrMagnitude < .0001f) return;
+            float yaw = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
+            float targetPitch = Mathf.Clamp(-Mathf.Atan2(direction.y, horizontal) * Mathf.Rad2Deg, -82f, 82f);
+            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(0, yaw, 0), blend);
+            pitch = Mathf.LerpAngle(pitch, targetPitch, blend);
+            ViewCamera.transform.localRotation = Quaternion.Euler(pitch, 0, 0);
         }
 
         void AnimateHands()

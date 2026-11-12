@@ -9,6 +9,7 @@ namespace Haunter
     {
 #if UNITY_WEBGL && !UNITY_EDITOR
         [DllImport("__Internal")] static extern int Haunter_SmokeRequested();
+        [DllImport("__Internal")] static extern int Haunter_TutorialSmokeRequested();
         [DllImport("__Internal")] static extern int Haunter_DiagnosticsRequested();
         [DllImport("__Internal")] static extern int Haunter_HasPointerLock();
         [DllImport("__Internal")] static extern void Haunter_RequestPointerLock();
@@ -27,6 +28,8 @@ namespace Haunter
             public bool crouching, sprinting, chargingThrow, creatureInvestigating, creatureDistracted, creatureLingering;
             public float throwCharge, caneReady, distractionSeconds;
             public string heldObject, nearbyObject;
+            public string tutorialStage;
+            public bool tutorialFrozen;
         }
 
         bool diagnostics;
@@ -46,7 +49,7 @@ namespace Haunter
 
         void Awake()
         {
-            smoke = SmokeRequested;
+            smoke = SmokeRequested || TutorialSmokeRequested;
             diagnostics = Haunter_DiagnosticsRequested() != 0;
         }
 
@@ -84,7 +87,9 @@ namespace Haunter
                 heldObject = player.HeldObject ? player.HeldObject.DisplayName : "",
                 nearbyObject = player.NearbyObject ? player.NearbyObject.DisplayName : "",
                 creatureInvestigating = creature.IsInvestigating, creatureDistracted = creature.IsCommittedToDistraction,
-                creatureLingering = creature.IsLingeringAtDistraction, distractionSeconds = creature.DistractionTimeRemaining
+                creatureLingering = creature.IsLingeringAtDistraction, distractionSeconds = creature.DistractionTimeRemaining,
+                tutorialStage = session.Tutorial != null ? session.Tutorial.Stage.ToString() : "Inactive",
+                tutorialFrozen = session.Tutorial != null && session.Tutorial.WorldFrozen
             };
             Haunter_PublishState(JsonUtility.ToJson(snapshot));
         }
@@ -97,7 +102,7 @@ namespace Haunter
             pointerLockRequestedAt = Time.unscaledTime;
             // Use the Begin/Resume gesture's transient activation even when its key-up
             // has already happened before Unity processes this frame.
-            if (!SmokeRequested) Haunter_RequestPointerLock();
+            if (!SmokeRequested && !TutorialSmokeRequested) Haunter_RequestPointerLock();
 #endif
         }
 
@@ -107,6 +112,18 @@ namespace Haunter
             {
 #if UNITY_WEBGL && !UNITY_EDITOR
                 return Haunter_SmokeRequested() != 0;
+#else
+                return false;
+#endif
+            }
+        }
+
+        public static bool TutorialSmokeRequested
+        {
+            get
+            {
+#if UNITY_WEBGL && !UNITY_EDITOR
+                return Haunter_TutorialSmokeRequested() != 0;
 #else
                 return false;
 #endif

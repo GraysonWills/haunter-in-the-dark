@@ -35,8 +35,15 @@ This download is a **Windows 64-bit desktop build**; Unity is not needed to play
 | Pause and release the cursor | Esc | Esc |
 | Resume | Enter or click Resume | Esc or click Resume |
 | Restart after an ending | R | R |
+| Skip the guided opening | T, or the pause-menu button | T, or the pause-menu button |
 
 In the browser, **Shift + W** moves forward quietly and **R + W** sprints. Ctrl is not a browser movement binding, so crouching does not require the Ctrl + W tab-closing shortcut. Close the browser tab to leave the web game, or use Alt + F4 for the Windows player.
+
+### Guided opening
+
+Each new run teaches the controls inside the encounter. Tap the cane, watch the creature's paw echoes by the exit, then take two steps. When it charges, time freezes: the camera finds a nearby object, **E** picks it up, and a second camera cue aims a distraction. **Hold and release left mouse** to throw. The real impact draws the creature away for its usual five-second inspection. Hold the crouch key and move quietly as it returns to guard the exit.
+
+The pickup and throw instructions lock movement and mouse look, and wait as long as you need. Pausing preserves the frozen step. **T** skips the tutorial at any point; the title screen also has **Play without tutorial**, and the pause menu has **Skip tutorial & resume**. Completing or skipping applies to the current run only: retrying after death starts the guided opening again. The character's reaction is shown as an on-screen caption.
 
 The arrow at the top points toward the exit. The creature guards that door and runs faster than your sprint. Crouching reduces how far it hears your steps. A nearby thrown-object impact can interrupt its pursuit of you. Once distracted, it commits to that impact area, reaches it, and investigates for **five full seconds** before returning to the exit. Footsteps, cane taps, other objects and repeated bounces cannot redirect it or restart that timer during the approach or linger. Its own paw sounds reveal the room without attracting it to itself. There are 32 cans, bottles and stones; held props keep their outlines visible.
 
@@ -103,5 +110,7 @@ Output goes to `Builds/WebGL`. Serve that folder over HTTP rather than opening `
 Run `Test.ps1` to execute the opt-in smoke test in a visible Windows player window (a hidden player returns black screen captures). It writes `Builds/Windows/Evidence/smoke-report.json` and eight screenshots, including darkness, the cane wave, held prop near a wall, creature, and both ending screens. It checks rendering, physics impacts, sound-driven AI, reachability and state transitions. Automated input is isolated from the keyboard. It has a real-time timeout and exits with a nonzero code on failure. The normal game does not run these checks.
 
 Version 0.3.0 passed **50 checks with no failures or runtime errors**. See [verification details](docs/VERIFICATION.md) and the [recorded report](docs/evidence/smoke-report.json).
+
+For the guided opening, run `Test-Tutorial.ps1` after building Windows. It checks the real action sequence, frozen camera and physics, pause/resume, all skip stages, death/retry, and backward/sideways starts. The hidden player writes `Builds/Windows/TutorialEvidence/tutorial-report.json`; its screenshots may be black because the window is hidden. For rendered browser checks, serve `Builds/WebGL`, open `/?tutorialSmoke=1`, and click **Play in browser**. The opt-in test displays its JSON result below the game. `/?smoke=1` runs the existing gameplay/rendering regression suite. Normal play does not run either suite.
 
 Rendering references: [Unity camera depth textures](https://docs.unity3d.com/2023.1/Documentation/Manual/SL-CameraDepthTexture.html) and [OnRenderImage](https://docs.unity3d.com/2023.1/Documentation/ScriptReference/MonoBehaviour.OnRenderImage.html).
