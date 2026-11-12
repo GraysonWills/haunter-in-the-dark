@@ -1,6 +1,17 @@
 {
-  "generatedAtUtc": "2026-11-12T02:20:21.7027955Z",
+  "generatedAtUtc": "2026-11-12T21:20:28.7332008Z",
   "platform": "WebGL 2",
-  "sourceCommit": "0dffd55ceb6ab02500eb24287141a16f8d13612a",
-  "unityVersion": "2023.1.14f1"
+  "sourceCommit": "836549665fdd4905e28fbbcc85b5afdd5e616916",
+  "unityVersion": "2023.1.14f1",
+  "features": [
+    "guided-tutorial"
+  ],
+  "assetSha256": {
+    ".nojekyll": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "index.html": "b0fb2084ced87eab32b600f9710faf29cfe8dbdb98305c60d9e5c56db1f4ff5c",
+    "Build/4fc9fd6e1dcaf36dd481fd64b045d718.js.unityweb": "0dbb1facc2ed0ffe9a915ece953c409154285cfcf75a120f1f24cb2f4ce00b8c",
+    "Build/6eba8f99d887cfc0bd8212ce8ba0d4c5.wasm.unityweb": "bf628c35c295eaa126d1ceec6e5f69ce667f83f7edb83e90b35143043d3635c9",
+    "Build/a56e423b03afa5a0f13f12b6f3c97374.data.unityweb": "c6fa4c7fa94f45a6b5a1373b79243447d96bab9dc629728ca9f4498680b549ec",
+    "Build/WebGL.loader.js": "3a1e1233c2d6c8a0eb4c8d7604a4cc056063b7bf34351d160b25f84a15027150"
+  }
 }
