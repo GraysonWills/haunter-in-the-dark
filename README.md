@@ -8,9 +8,11 @@ A playable first-person Unity horror concept. Sound is your only sight: footstep
 
 ## Play in your browser
 
-Open **[Haunter in the Dark](https://graysonwills.github.io/haunter-in-the-dark/)** in a desktop browser and click **Play**. The game loads directly on the page; no installation or Unity editor is needed. Use a keyboard and mouse, and click the game to capture the mouse. Escape pauses and releases it. The fullscreen button expands the game.
+Open **[Haunter in the Dark](https://graysonwills.github.io/haunter-in-the-dark/)** and select **Play in browser**. The game loads directly on the page; no installation or Unity editor is needed. Desktop players use a keyboard and mouse: click the game to capture the mouse, and press Escape to pause and release it. Touch controls appear automatically on compatible touch devices, with large buttons for starting, resuming and restarting.
 
-The browser version uses the same Unity scene, echo shaders and creature behavior as the Windows game, with separate crouch and sprint keys to avoid browser shortcuts. It requires WebGL 2 and is designed for desktop play; touch controls are not included. The first load downloads the game into your browser, so allow the loading bar to finish.
+The browser version uses the same Unity scene, echo shaders and creature behavior as the Windows game. It requires WebGL 2; on an iPad, use a current iPadOS and Safari version. Landscape orientation is recommended. Touch mode does not require mouse capture, so it avoids the repeated pause/resume loop caused by that desktop requirement. The first load downloads the game into your browser, so allow the loading bar to finish. Actual iPad hardware validation is still pending.
+
+Use the **Touch controls** toggle before starting or while paused to choose the input mode. You can also open **[the touch-mode link](https://graysonwills.github.io/haunter-in-the-dark/?touch=1)** to force touch controls. The fullscreen button expands the game with its controls; when browser fullscreen is unavailable, touch mode uses an expanded page view.
 
 ## Play on Windows
 
@@ -21,9 +23,11 @@ The browser version uses the same Unity scene, echo shaders and creature behavio
 
 This download is a **Windows 64-bit desktop build**; Unity is not needed to play. GitHub's **Code → Download ZIP** contains the Unity source project, not the playable Windows build.
 
+The downloadable Windows release remains **v0.4.0**. This touch-controls update is for the browser build.
+
 ## Controls and objective
 
-| Action | Browser | Windows |
+| Action | Browser keyboard/mouse | Windows |
 |---|---|---|
 | Move / look | WASD / mouse | WASD / mouse |
 | Tap your cane | Space or right mouse | Space or right mouse |
@@ -39,11 +43,28 @@ This download is a **Windows 64-bit desktop build**; Unity is not needed to play
 
 In the browser, **Shift + W** moves forward quietly and **R + W** sprints. Ctrl is not a browser movement binding, so crouching does not require the Ctrl + W tab-closing shortcut. Close the browser tab to leave the web game, or use Alt + F4 for the Windows player.
 
+### Touch controls
+
+| Action | Touch input |
+|---|---|
+| Move | Drag the left stick |
+| Look | Drag an empty part of the game view |
+| Tap your cane | Tap **Cane** |
+| Pick up an object / use the exit | Tap **Pick up** / **Exit** when available |
+| Charge and throw | Hold **Throw**, then release |
+| Drop the held object | Tap **Drop** |
+| Crouch and move quietly | Tap **Crouch** to toggle it on or off |
+| Sprint | Hold **Sprint** while moving |
+| Pause / resume | Tap **Pause**, then **Resume** |
+| Skip the guided opening | Use **Skip tutorial** on the title screen, or **Pause → Skip tutorial & resume** |
+
+Movement, looking and action buttons support simultaneous touches. The tutorial enables only the controls needed for its current step. Leaving the page pauses the game and clears held inputs; an interrupted throw is canceled instead of releasing the object.
+
 ### Guided opening
 
-Each new run teaches the controls inside the encounter. Tap the cane, watch the creature's paw echoes by the exit, then take two steps. When it charges, time freezes: the camera finds a nearby object, **E** picks it up, and a second camera cue aims a distraction. **Hold and release left mouse** to throw. The real impact draws the creature away for its usual five-second inspection. Hold the crouch key and move quietly as it returns to guard the exit.
+Each new run teaches the controls inside the encounter. Tap the cane, watch the creature's paw echoes by the exit, then take two steps. When it charges, time freezes: the camera finds a nearby object, **E** or **Pick up** grabs it, and a second camera cue aims a distraction. **Hold and release left mouse**, or the **Throw** button, to throw. The real impact draws the creature away for its usual five-second inspection. Hold the crouch key, or toggle **Crouch** on in touch mode, and move quietly as it returns to guard the exit.
 
-The pickup and throw instructions lock movement and mouse look, and wait as long as you need. Pausing preserves the frozen step. **T** skips the tutorial at any point; the title screen also has **Play without tutorial**, and the pause menu has **Skip tutorial & resume**. Completing or skipping applies to the current run only: retrying after death starts the guided opening again. The character's reaction is shown as an on-screen caption.
+The pickup and throw instructions lock movement and looking, and wait as long as you need. Prompts adapt to touch or keyboard/mouse input. Pausing preserves the frozen step. **T** skips the tutorial with a keyboard; the title screen offers **Play without tutorial** for desktop input or **Skip tutorial** for touch input, and the pause menu has **Skip tutorial & resume**. Completing or skipping applies to the current run only: retrying after death starts the guided opening again. The character's reaction is shown as an on-screen caption.
 
 The arrow at the top points toward the exit. The creature guards that door and runs faster than your sprint. Crouching reduces how far it hears your steps. A nearby thrown-object impact can interrupt its pursuit of you. Once distracted, it commits to that impact area, reaches it, and investigates for **five full seconds** before returning to the exit. Footsteps, cane taps, other objects and repeated bounces cannot redirect it or restart that timer during the approach or linger. Its own paw sounds reveal the room without attracting it to itself. There are 32 cans, bottles and stones; held props keep their outlines visible.
 

@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using UnityEngine.AI;
 
 namespace Haunter
 {
@@ -192,6 +193,8 @@ namespace Haunter
                 "Throw releases the physical prop instead of merely advancing the prompt");
             Check(tutorial.Stage == TutorialStage.WatchDistraction && Time.timeScale == 1f,
                 "Throw resumes physics to demonstrate the distraction");
+            yield return CheckProximityCapture(session, true);
+            if (session.State != SessionState.Playing) { Finish(); yield break; }
             yield return WaitForStage(tutorial, TutorialStage.Crouch, 15f);
             if (!reached) { Finish(); yield break; }
             Check(targetImpacts > 0 && creature.IsLingeringAtDistraction,
@@ -219,8 +222,7 @@ namespace Haunter
                 && player.AllowedActions == PlayerActions.All, "The guard returns and the completed tutorial restores normal play");
             yield return new WaitForSecondsRealtime(.3f);
             Check(tutorial.Stage == TutorialStage.Complete, "Completed tutorial does not restart during the same run");
-            session.Catch();
-            Check(session.State == SessionState.Caught, "A completed tutorial still permits the normal death state");
+            yield return CheckProximityCapture(session, false);
             yield return RestartRun();
             session = GameSession.Instance;
             Check(session && session.Tutorial.Stage == TutorialStage.TapCane && session.Tutorial.FootstepsTaken == 0,
@@ -283,6 +285,36 @@ namespace Haunter
             }
             Check(errors.Count == 0, "No Unity errors or exceptions during tutorial and cancellation checks");
             Finish();
+        }
+
+        IEnumerator CheckProximityCapture(GameSession session, bool forcedObservation)
+        {
+            var player = session.Player;
+            var creature = session.Creature;
+            var controller = player.GetComponent<CharacterController>();
+            var agent = creature.GetComponent<NavMeshAgent>();
+            Vector3 originalPosition = player.transform.position;
+            float originalSpeed = agent.speed;
+            bool controllerEnabled = controller.enabled;
+            // Hold position for one real Update so the proximity condition is identical
+            // on slow browser frames. The normal creature Update performs the catch check.
+            agent.speed = 0f;
+            controller.enabled = false;
+            player.transform.position = creature.transform.position;
+            Physics.SyncTransforms();
+            yield return null;
+            bool inReach = PlayerController.HorizontalDistance(player.transform.position, creature.transform.position) <= 1.1f;
+            bool correctState = forcedObservation
+                ? session.State == SessionState.Playing && session.Tutorial.Stage == TutorialStage.WatchDistraction
+                    && !Allows(player, PlayerActions.Move)
+                : session.State == SessionState.Caught;
+            player.transform.position = originalPosition;
+            controller.enabled = controllerEnabled;
+            agent.speed = originalSpeed;
+            Physics.SyncTransforms();
+            Check(inReach && correctState, forcedObservation
+                ? "An immobile player cannot be caught while forced to watch the thrown distraction"
+                : "A completed tutorial restores ordinary creature proximity capture");
         }
 
         IEnumerator WalkUntilFootsteps(GameSession session, int count)

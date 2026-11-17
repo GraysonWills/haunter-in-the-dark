@@ -7,12 +7,14 @@ namespace Haunter
     public sealed class PlayerController : MonoBehaviour
     {
 #if UNITY_WEBGL && !UNITY_EDITOR
-        public const string CrouchKeys = "SHIFT / C";
-        public const string SprintKeys = "R";
+        const string DesktopCrouchKeys = "SHIFT / C";
+        const string DesktopSprintKeys = "R";
 #else
-        public const string CrouchKeys = "CTRL / C";
-        public const string SprintKeys = "SHIFT";
+        const string DesktopCrouchKeys = "CTRL / C";
+        const string DesktopSprintKeys = "SHIFT";
 #endif
+        public static string CrouchKeys => TouchControls.Enabled ? "CROUCH" : DesktopCrouchKeys;
+        public static string SprintKeys => TouchControls.Enabled ? "SPRINT" : DesktopSprintKeys;
         [Header("Movement")]
         public float WalkSpeed = 2.8f;
         public float CrouchSpeed = 1.35f;
@@ -117,6 +119,15 @@ namespace Haunter
 
         void Look()
         {
+            if (TouchControls.Enabled)
+            {
+                // Deltas are CSS pixels, independent of render resolution and frame duration.
+                Vector2 drag = TouchControls.Look * .16f;
+                transform.Rotate(0f, drag.x, 0f);
+                pitch = Mathf.Clamp(pitch + drag.y, -82f, 82f);
+                ViewCamera.transform.localRotation = Quaternion.Euler(pitch, 0f, 0f);
+                return;
+            }
             if (Cursor.lockState != CursorLockMode.Locked) return;
             transform.Rotate(0f, Input.GetAxisRaw("Mouse X") * MouseSensitivity, 0f);
             pitch = Mathf.Clamp(pitch - Input.GetAxisRaw("Mouse Y") * MouseSensitivity, -82f, 82f);
@@ -125,6 +136,11 @@ namespace Haunter
 
         void Move()
         {
+            if (TouchControls.Enabled)
+            {
+                ApplyMovement(TouchControls.Move, TouchControls.Pressed(TouchControls.Crouch), TouchControls.Pressed(TouchControls.Sprint));
+                return;
+            }
 #if UNITY_WEBGL && !UNITY_EDITOR
             // Ctrl + movement keys can trigger browser shortcuts such as closing the tab.
             bool crouchRequested = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) || Input.GetKey(KeyCode.C);
@@ -180,6 +196,7 @@ namespace Haunter
 
         void Interact()
         {
+            bool touch = TouchControls.Enabled;
             NearbyObject = null;
             if (HeldObject == null && Physics.Raycast(ViewCamera.transform.position, ViewCamera.transform.forward,
                 out RaycastHit hit, PickupReach, ~(1 << 9), QueryTriggerInteraction.Ignore))
@@ -187,13 +204,13 @@ namespace Haunter
                 NearbyObject = hit.collider.GetComponentInParent<ThrowableObject>();
                 if (NearbyObject != null && NearbyObject.IsHeld) NearbyObject = null;
             }
-            if (Input.GetKeyDown(KeyCode.E))
+            if (touch ? TouchControls.Pressed(TouchControls.Pickup) : Input.GetKeyDown(KeyCode.E))
             {
                 if (Allows(PlayerActions.Pickup) && HeldObject == null && NearbyObject != null) PickUp(NearbyObject);
                 else if (Allows(PlayerActions.Exit) && GameSession.Instance.Exit != null && HorizontalDistance(transform.position, GameSession.Instance.Exit.position) < 1.9f)
                     GameSession.Instance.Escape();
             }
-            if (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(1)) TapCane();
+            if (touch ? TouchControls.Pressed(TouchControls.Cane) : Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(1)) TapCane();
             if (HeldObject == null)
             {
                 ChargingThrow = false;
@@ -201,14 +218,16 @@ namespace Haunter
                 return;
             }
             if (!Allows(PlayerActions.Throw)) { CancelThrow(); return; }
-            if (Input.GetKeyDown(KeyCode.Q))
+            if (touch && TouchControls.Pressed(TouchControls.CancelThrow)) { CancelThrow(); return; }
+            if (touch ? TouchControls.Pressed(TouchControls.Drop) : Input.GetKeyDown(KeyCode.Q))
             {
                 DropHeld();
                 return;
             }
-            if (Input.GetMouseButtonDown(0)) { ChargingThrow = true; chargeStart = Time.unscaledTime; }
+            bool startThrow = touch ? !ChargingThrow && (TouchControls.Pressed(TouchControls.ThrowHeld) || TouchControls.Pressed(TouchControls.ThrowReleased)) : Input.GetMouseButtonDown(0);
+            if (startThrow) { ChargingThrow = true; chargeStart = Time.unscaledTime; }
             if (ChargingThrow) ThrowCharge = Mathf.Clamp01((Time.unscaledTime - chargeStart) / .8f);
-            if (ChargingThrow && Input.GetMouseButtonUp(0))
+            if (ChargingThrow && (touch ? TouchControls.Pressed(TouchControls.ThrowReleased) : Input.GetMouseButtonUp(0)))
             {
                 Vector3 direction = (ViewCamera.transform.forward + Vector3.up * .14f).normalized;
                 ThrowHeld(direction * Mathf.Lerp(7.2f, 15f, ThrowCharge));

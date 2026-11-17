@@ -23,7 +23,7 @@ namespace Haunter
             public string state;
             public float elapsedSeconds;
             public int soundsMade, activePulses;
-            public bool pointerLocked, navigationReady;
+            public bool pointerLocked, touchControls, navigationReady;
             public Vector3 playerPosition, playerRotation, cameraRotation, exitPosition, creaturePosition, creatureTarget;
             public bool crouching, sprinting, chargingThrow, creatureInvestigating, creatureDistracted, creatureLingering;
             public float throwCharge, caneReady, distractionSeconds;
@@ -57,8 +57,9 @@ namespace Haunter
         {
             var session = GameSession.Instance;
             if (!session) return;
+            TouchControls.Publish(session);
             bool locked = Haunter_HasPointerLock() != 0;
-            if (!smoke && session.State == SessionState.Playing)
+            if (!smoke && !TouchControls.Enabled && session.State == SessionState.Playing)
             {
                 if (locked) acquiredPointerLock = true;
                 // Esc may be consumed by the browser before Unity receives its key event.
@@ -78,7 +79,7 @@ namespace Haunter
             {
                 state = session.State.ToString(), elapsedSeconds = session.ElapsedSeconds,
                 soundsMade = session.SoundsMade, activePulses = NoiseSystem.Instance ? NoiseSystem.Instance.ActivePulseCount : 0,
-                pointerLocked = locked, navigationReady = world && world.NavMeshReady,
+                pointerLocked = locked, touchControls = TouchControls.Enabled, navigationReady = world && world.NavMeshReady,
                 playerPosition = player.transform.position, playerRotation = player.transform.eulerAngles,
                 cameraRotation = player.ViewCamera ? player.ViewCamera.transform.eulerAngles : Vector3.zero,
                 exitPosition = session.Exit.position, creaturePosition = creature.transform.position,
@@ -95,6 +96,26 @@ namespace Haunter
         }
 #endif
 
+        // Called by the template's large touch menu buttons; normal session guards still apply.
+        public void TouchMenuAction(string action)
+        {
+            if (!TouchControls.Enabled) return;
+            var session = GameSession.Instance;
+            if (session == null) return;
+            if (action == "begin") session.Begin();
+            else if (action == "resume") session.Resume();
+            else if (action == "skip")
+            {
+                if (session.State == SessionState.Ready) session.Begin(true);
+                else if (session.State == SessionState.Paused)
+                {
+                    session.Tutorial.Skip();
+                    session.Resume();
+                }
+            }
+            else if (action == "restart" && session.State != SessionState.Playing) session.Restart();
+        }
+
         public static void NotifyPointerLockRequest()
         {
 #if UNITY_WEBGL && !UNITY_EDITOR
@@ -102,7 +123,7 @@ namespace Haunter
             pointerLockRequestedAt = Time.unscaledTime;
             // Use the Begin/Resume gesture's transient activation even when its key-up
             // has already happened before Unity processes this frame.
-            if (!SmokeRequested && !TutorialSmokeRequested) Haunter_RequestPointerLock();
+            if (!TouchControls.Enabled && !SmokeRequested && !TutorialSmokeRequested) Haunter_RequestPointerLock();
 #endif
         }
 

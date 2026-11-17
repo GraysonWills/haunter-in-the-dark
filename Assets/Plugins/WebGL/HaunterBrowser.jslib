@@ -1,4 +1,19 @@
 mergeInto(LibraryManager.library, {
+  Haunter_TouchEnabled: function () {
+    return window.haunterTouch && window.haunterTouch.enabled ? 1 : 0;
+  },
+  Haunter_TouchAxis: function (axis) {
+    return window.haunterTouch ? window.haunterTouch.axis(axis) : 0;
+  },
+  Haunter_TouchButtons: function () {
+    return window.haunterTouch ? window.haunterTouch.buttons() : 0;
+  },
+  Haunter_ResetTouchInput: function () {
+    if (window.haunterTouch) window.haunterTouch.reset();
+  },
+  Haunter_UpdateTouchState: function (state, actions, held, nearby, charge) {
+    if (window.haunterTouch) window.haunterTouch.update(state, actions, held, nearby, charge);
+  },
   Haunter_SmokeRequested: function () {
     return new URLSearchParams(window.location.search).get("smoke") === "1" ? 1 : 0;
   },
@@ -27,6 +42,17 @@ mergeInto(LibraryManager.library, {
   Haunter_PublishState: function (json) {
     window.haunterState = JSON.parse(UTF8ToString(json));
     window.render_game_to_text = function () { return JSON.stringify(window.haunterState); };
+    // Opt-in diagnostic UI permits inspecting the same snapshot without browser internals.
+    if (new URLSearchParams(window.location.search).get("debug") === "1") {
+      var state = document.getElementById("haunter-debug-state");
+      if (!state) {
+        state = document.createElement("pre");
+        state.id = "haunter-debug-state";
+        state.style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere;padding:20px;font-size:12px";
+        document.body.appendChild(state);
+      }
+      state.textContent = JSON.stringify(window.haunterState);
+    }
   },
   Haunter_RecordScreenshot: function (name, base64) {
     window.haunterSmokeScreenshots = window.haunterSmokeScreenshots || {};

@@ -407,13 +407,18 @@ namespace Haunter
 
         private void CheckCatch()
         {
-            if (player == null) return;
+            var session = GameSession.Instance;
+            if (player == null || session == null) return;
+            // The thrown prop still takes real flight time to distract the creature, while
+            // this lesson locks player movement. Do not punish that forced observation;
+            // ordinary proximity capture resumes as soon as the crouch lesson begins.
+            if (session.Tutorial != null && session.Tutorial.Stage == TutorialStage.WatchDistraction) return;
             Vector3 offset = player.position - transform.position;
             offset.y = 0;
             if (offset.sqrMagnitude > 1.1f * 1.1f) return;
             Vector3 eye = transform.position + Vector3.up * .9f;
             Vector3 destination = player.position + Vector3.up * .9f;
-            if (!Physics.Linecast(eye, destination, 1, QueryTriggerInteraction.Ignore)) GameSession.Instance.Catch();
+            if (!Physics.Linecast(eye, destination, 1, QueryTriggerInteraction.Ignore)) session.Catch();
         }
 
         private void AnimateLegs(float speed)

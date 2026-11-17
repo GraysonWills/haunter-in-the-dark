@@ -74,6 +74,19 @@ namespace Haunter
         {
             get
             {
+                if (TouchControls.Enabled)
+                {
+                    switch (Stage)
+                    {
+                        case TutorialStage.TapCane: return "Tap CANE to see the room. Drag the view to look around.";
+                        case TutorialStage.Move: return "Drag the left stick to move. Your footsteps make sound, too.";
+                        case TutorialStage.Pickup: return "Tap PICK UP to grab the " + (TargetObject ? TargetObject.DisplayName.ToLowerInvariant() : "object") + ".";
+                        case TutorialStage.Throw: return "Hold THROW, then release. Time resumes when you throw.";
+                        case TutorialStage.Crouch: return HasCrouched
+                            ? "Keep CROUCH on and use the left stick to move quietly."
+                            : "Tap CROUCH, then use the left stick to sneak past.";
+                    }
+                }
                 switch (Stage)
                 {
                     case TutorialStage.TapCane: return "SPACE / RIGHT MOUSE  —  Tap your cane to see the room.";
@@ -304,9 +317,8 @@ namespace Haunter
                 Vector3 eye = Player.ViewCamera.transform.position;
                 Vector3 release = eye + (candidate - eye).normalized * .7f;
                 float flight = FlightTime(release, candidate);
-                // The player cannot dodge during the demonstration: land before the charging guard can reach them.
-                float timeUntilCatch = (PlayerController.HorizontalDistance(Player.transform.position, Creature.transform.position) - 1.1f) / Creature.ChaseSpeed;
-                if (flight > .8f || flight + .18f >= timeUntilCatch) continue;
+                // WatchDistraction protects the immobilized player while this real arc lands.
+                // Validate reachability below rather than rejecting safe, slower lateral throws.
                 Vector3 velocity = BallisticVelocity(release, candidate, flight);
                 Vector3 previous = eye;
                 bool clear = true;

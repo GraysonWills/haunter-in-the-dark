@@ -57,7 +57,7 @@ namespace Haunter
             if (State == SessionState.Playing)
             {
                 ElapsedSeconds += Time.deltaTime;
-                if (Input.GetKeyDown(KeyCode.Escape)) Pause();
+                if (Input.GetKeyDown(KeyCode.Escape) || (TouchControls.Enabled && TouchControls.Pressed(TouchControls.Pause))) Pause();
             }
             else if (State == SessionState.Ready && Input.GetKeyDown(KeyCode.Return)) Begin();
 #if !UNITY_WEBGL || UNITY_EDITOR
@@ -121,11 +121,16 @@ namespace Haunter
         void OnApplicationFocus(bool focused)
         {
             if (FindFirstObjectByType<PrototypeSmokeTest>() != null || FindFirstObjectByType<TutorialSmokeTest>() != null) return;
+            // HTML touch buttons can take focus from the canvas without leaving the game.
+            // The touch bridge pauses on actual window blur / document visibility loss.
+            if (TouchControls.Enabled) return;
             if (!focused && State == SessionState.Playing) Pause();
         }
 
         static void SetCursor(bool locked)
         {
+            TouchControls.Reset();
+            if (TouchControls.Enabled) locked = false;
             Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
             Cursor.visible = !locked;
 #if UNITY_WEBGL && !UNITY_EDITOR
@@ -208,11 +213,15 @@ namespace Haunter
             Text(new Rect(110, 310, 900, 75), "IN THE DARK", subtitle, .9f);
             GUI.Label(new Rect(112, 427, 640, 100), "Every sound shows you the room.\nEvery sound tells it where to look.", body);
             Text(new Rect(112, 535, 640, 28), "It guards the exit. Draw it away, then slip past.", label, .72f);
-            if (DrawButton(new Rect(110, 613, 330, 60), "ENTER THE DARK     /     ENTER")) Begin();
-            if (DrawButton(new Rect(110, 684, 330, 32), "PLAY WITHOUT TUTORIAL")) Begin(true);
-            Text(new Rect(110, 724, 750, 25), "WASD   MOVE       MOUSE   LOOK       " + PlayerController.CrouchKeys + "   CROUCH", small, .65f);
-            Text(new Rect(110, 753, 700, 25), "SPACE / RMB   TAP CANE       E   PICK UP       HOLD LMB   THROW", small, .65f);
-            Text(new Rect(110, 782, 700, 25), "Q   DROP       " + PlayerController.SprintKeys + "   RUN       ESC   PAUSE", small, .5f);
+            if (!TouchControls.Enabled)
+            {
+                if (DrawButton(new Rect(110, 613, 330, 60), "ENTER THE DARK     /     ENTER")) Begin();
+                if (DrawButton(new Rect(110, 684, 330, 32), "PLAY WITHOUT TUTORIAL")) Begin(true);
+                Text(new Rect(110, 724, 750, 25), "WASD   MOVE       MOUSE   LOOK       " + PlayerController.CrouchKeys + "   CROUCH", small, .65f);
+                Text(new Rect(110, 753, 700, 25), "SPACE / RMB   TAP CANE       E   PICK UP       HOLD LMB   THROW", small, .65f);
+                Text(new Rect(110, 782, 700, 25), "Q   DROP       " + PlayerController.SprintKeys + "   RUN       ESC   PAUSE", small, .5f);
+            }
+            else Text(new Rect(110, 600, 900, 50), "LEFT STICK   MOVE     DRAG THE VIEW   LOOK", label, .7f);
             Fill(new Rect(110, 847, 1380, 1), .15f);
             Text(new Rect(110, 863, 700, 20), "A FICTIONAL ECHOLOCATION HORROR CONCEPT", small, .4f);
             Text(new Rect(1320, 863, 250, 20), "HEADPHONES ADVISED", small, .4f);
@@ -239,9 +248,9 @@ namespace Haunter
             if (Player != null)
             {
                 string prompt = string.Empty;
-                if (Player.HeldObject != null) prompt = "HOLD LMB  THROW " + Player.HeldObject.DisplayName.ToUpperInvariant() + "     /     Q  DROP";
-                else if (Player.NearbyObject != null) prompt = "E  PICK UP " + Player.NearbyObject.DisplayName.ToUpperInvariant();
-                else if (Exit != null && PlayerController.HorizontalDistance(Player.transform.position, Exit.position) < 2.2f) prompt = "E  LEAVE THE ARCHIVE";
+                if (Player.HeldObject != null) prompt = (TouchControls.Enabled ? "HOLD THROW  /  TAP DROP     " : "HOLD LMB  THROW / Q  DROP     ") + Player.HeldObject.DisplayName.ToUpperInvariant();
+                else if (Player.NearbyObject != null) prompt = (TouchControls.Enabled ? "TAP PICK UP     " : "E  PICK UP ") + Player.NearbyObject.DisplayName.ToUpperInvariant();
+                else if (Exit != null && PlayerController.HorizontalDistance(Player.transform.position, Exit.position) < 2.2f) prompt = TouchControls.Enabled ? "TAP EXIT TO LEAVE THE ARCHIVE" : "E  LEAVE THE ARCHIVE";
                 if (!string.IsNullOrEmpty(prompt) && (Tutorial == null || !Tutorial.Active))
                 {
                     Fill(new Rect(500, 526, 600, 45), .72f, false);
@@ -253,7 +262,7 @@ namespace Haunter
                     Fill(new Rect(700, 590, 200 * Player.ThrowCharge, 2), .95f);
                     Text(new Rect(700, 605, 200, 25), "RELEASE TO THROW", centered, .65f);
                 }
-                if (Tutorial == null || !Tutorial.Active || Tutorial.Stage == TutorialStage.TapCane)
+                if (!TouchControls.Enabled && (Tutorial == null || !Tutorial.Active || Tutorial.Stage == TutorialStage.TapCane))
                 {
                     Fill(new Rect(50, 806, 240, 50), .65f, false);
                     Text(new Rect(63, 815, 250, 22), "SPACE / RMB   TAP CANE", label, .8f);
@@ -261,7 +270,7 @@ namespace Haunter
                     Fill(new Rect(63, 846, 202 * Player.CaneReady, 2), .65f);
                 }
                 string movement = Player.IsCrouching ? "CROUCHING / QUIET" : Player.IsSprinting ? "RUNNING / LOUD" : PlayerController.CrouchKeys + "  CROUCH";
-                Text(new Rect(50, 873, 320, 20), movement, small, .45f);
+                if (!TouchControls.Enabled) Text(new Rect(50, 873, 320, 20), movement, small, .45f);
             }
             float soundFade = Mathf.Clamp01(1f - (Time.time - lastNoiseAt) / 2.5f);
             Text(new Rect(1276, 815, 270, 24), soundFade > .02f ? lastSound : "SILENCE", label, .5f + soundFade * .35f);
@@ -278,12 +287,13 @@ namespace Haunter
 
         void DrawTutorial()
         {
-            Fill(new Rect(330, 650, 940, 137), .94f, false);
-            Fill(new Rect(330, 650, 940, 1), .38f);
-            Text(new Rect(350, 663, 900, 22), Tutorial.WorldFrozen ? "GUIDED OPENING  /  TIME FROZEN" : "GUIDED OPENING", centered, .48f);
-            GUI.Label(new Rect(350, 692, 900, 28), Tutorial.Heading, tutorialHeading);
-            Text(new Rect(360, 730, 880, 45), Tutorial.Instruction, tutorialCopy, .92f);
-            Text(new Rect(1330, 35, 240, 28), "T  SKIP TUTORIAL", small, .65f);
+            float top = TouchControls.Enabled ? 145f : 650f;
+            Fill(new Rect(330, top, 940, 137), .94f, false);
+            Fill(new Rect(330, top, 940, 1), .38f);
+            Text(new Rect(350, top + 13, 900, 22), Tutorial.WorldFrozen ? "GUIDED OPENING  /  TIME FROZEN" : "GUIDED OPENING", centered, .48f);
+            GUI.Label(new Rect(350, top + 42, 900, 28), Tutorial.Heading, tutorialHeading);
+            Text(new Rect(360, top + 80, 880, 45), Tutorial.Instruction, tutorialCopy, .92f);
+            if (!TouchControls.Enabled) Text(new Rect(1330, 35, 240, 28), "T  SKIP TUTORIAL", small, .65f);
             if (Tutorial.Stage == TutorialStage.Throw || Tutorial.Stage == TutorialStage.FocusThrow)
             {
                 Vector3 target = Player.ViewCamera.WorldToViewportPoint(Tutorial.ThrowTarget);
@@ -303,6 +313,11 @@ namespace Haunter
             Text(new Rect(110, 160, 650, 30), "TAKE A BREATH", label, .5f);
             GUI.Label(new Rect(103, 235, 900, 115), "PAUSED", title);
             GUI.Label(new Rect(112, 377, 700, 60), "The dark can wait.", body);
+            if (TouchControls.Enabled)
+            {
+                DrawEchoArtwork(new Vector2(1180, 460));
+                return; // Large HTML buttons provide Resume / Restart / Skip on touch screens.
+            }
 #if UNITY_WEBGL && !UNITY_EDITOR
             if (DrawButton(new Rect(110, 490, 330, 60), "RESUME     /     ENTER")) Resume();
 #else
@@ -333,7 +348,7 @@ namespace Haunter
             Text(new Rect(110, 630, 220, 22), "TIME IN THE DARK", small, .5f);
             GUI.Label(new Rect(420, 570, 220, 60), SoundsMade.ToString("00"), numeral);
             Text(new Rect(420, 630, 250, 22), "SOUNDS LEFT BEHIND", small, .5f);
-            if (DrawButton(new Rect(110, 727, 330, 60), "TRY AGAIN     /     R")) Restart();
+            if (!TouchControls.Enabled && DrawButton(new Rect(110, 727, 330, 60), "TRY AGAIN     /     R")) Restart();
             Text(new Rect(110, 856, 900, 22), "HAUNTER IN THE DARK     /     CONCEPT 01", small, .4f);
         }
 
