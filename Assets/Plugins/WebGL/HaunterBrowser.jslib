@@ -14,8 +14,8 @@ mergeInto(LibraryManager.library, {
   Haunter_ResetTouchInput: function () {
     if (window.haunterTouch) window.haunterTouch.reset();
   },
-  Haunter_UpdateTouchState: function (state, actions, held, nearby, charge) {
-    if (window.haunterTouch) window.haunterTouch.update(state, actions, held, nearby, charge);
+  Haunter_UpdateTouchState: function (state, actions, held, nearby, charge, menuFlags) {
+    if (window.haunterTouch) window.haunterTouch.update(state, actions, held, nearby, charge, menuFlags);
   },
   Haunter_UpdateTouchTutorial: function (heading, instruction, frozen) {
     if (window.haunterTouch) window.haunterTouch.updateTutorial(UTF8ToString(heading), UTF8ToString(instruction), frozen !== 0);
@@ -26,9 +26,33 @@ mergeInto(LibraryManager.library, {
   Haunter_TutorialSmokeRequested: function () {
     return new URLSearchParams(window.location.search).get("tutorialSmoke") === "1" ? 1 : 0;
   },
+  Haunter_ExpansionSmokeRequested: function () {
+    return new URLSearchParams(window.location.search).get("expansionSmoke") === "1" ? 1 : 0;
+  },
+  Haunter_PreviewLevel: function () {
+    var query = new URLSearchParams(window.location.search);
+    var level = Number(query.get("level"));
+    return query.get("debug") === "1" && level >= 2 && level <= 4 && level % 1 === 0 ? level : 0;
+  },
+  Haunter_ObserverRequested: function () {
+    var query = new URLSearchParams(window.location.search);
+    return query.get("debug") === "1" && query.get("observer") === "1" ? 1 : 0;
+  },
+  Haunter_CaptureShot: function () {
+    var query = new URLSearchParams(window.location.search);
+    var shot = Number(query.get("capture"));
+    return query.get("debug") === "1" && shot >= 1 && shot <= 8 && shot % 1 === 0 ? shot : 0;
+  },
+  Haunter_CaptureReady: function () {
+    return window.haunterCaptureReady === true ? 1 : 0;
+  },
+  Haunter_RecordCaptureState: function (json) {
+    window.haunterCaptureState = JSON.parse(UTF8ToString(json));
+  },
   Haunter_DiagnosticsRequested: function () {
     var query = new URLSearchParams(window.location.search);
-    return query.get("debug") === "1" || query.get("smoke") === "1" || query.get("tutorialSmoke") === "1" ? 1 : 0;
+    return query.get("debug") === "1" || query.get("smoke") === "1" || query.get("tutorialSmoke") === "1"
+      || query.get("expansionSmoke") === "1" ? 1 : 0;
   },
   Haunter_HasPointerLock: function () {
     return document.pointerLockElement === Module.canvas ? 1 : 0;

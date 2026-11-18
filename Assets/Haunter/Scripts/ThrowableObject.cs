@@ -16,6 +16,8 @@ namespace Haunter
         bool[] colliderStates;
         Collider carrierCollider;
         Camera carrierCamera;
+        Transform roomParent;
+        bool releasedByPlayer;
         bool ignoringCarrier;
         float lastImpact = -10f;
         float releaseTime;
@@ -36,7 +38,7 @@ namespace Haunter
             body.maxAngularVelocity = 16f;
             foreach (Transform child in GetComponentsInChildren<Transform>()) child.gameObject.layer = 8;
             Bounds bounds = new Bounds(transform.position, Vector3.zero);
-            foreach (Collider shape in shapeColliders) bounds.Encapsulate(shape.bounds);
+            foreach (Collider shape in shapeColliders) if (shape.enabled) bounds.Encapsulate(shape.bounds);
             safeRadius = Mathf.Clamp(Mathf.Max(bounds.extents.x, bounds.extents.y, bounds.extents.z), .08f, .3f);
             holdRadius = Mathf.Max(.08f, bounds.extents.magnitude + Vector3.Distance(bounds.center, transform.position));
         }
@@ -46,9 +48,14 @@ namespace Haunter
             EnsureComponents();
             if (IsHeld || anchor == null) return;
             RestoreCarrierCollision();
+            // Runtime-built props may have had temporary visual colliders removed
+            // after Awake. Cache only the live colliders at the point of pickup.
+            shapeColliders = GetComponentsInChildren<Collider>();
+            colliderStates = new bool[shapeColliders.Length];
             originalWorldScale = transform.lossyScale;
             carrierCollider = playerCollider;
             carrierCamera = anchor.GetComponentInParent<Camera>();
+            roomParent = transform.parent;
             body.velocity = Vector3.zero;
             body.angularVelocity = Vector3.zero;
             // Physics interpolation otherwise reapplies a stale world pose after the camera
@@ -70,6 +77,7 @@ namespace Haunter
             EchoMaterial.SetPersistent(gameObject, true);
         }
 
+        int impactEventId;
         public void Throw(Vector3 velocity) { Release(velocity); }
         public void Drop() { Release(Vector3.down * .35f); }
 
@@ -113,7 +121,7 @@ namespace Haunter
                 }
             }
             Quaternion releaseRotation = transform.rotation;
-            transform.SetParent(null, true);
+            transform.SetParent(roomParent, true);
             // Viewmodel pullback scales only its presentation; physics retains its original size.
             transform.localScale = originalWorldScale;
             transform.SetPositionAndRotation(position, releaseRotation);
@@ -126,6 +134,8 @@ namespace Haunter
             body.interpolation = RigidbodyInterpolation.Interpolate;
             body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
             body.velocity = velocity;
+            impactEventId = NoiseSystem.NewEventId();
+            releasedByPlayer = true;
             body.angularVelocity = Random.onUnitSphere * Random.Range(3f, 9f);
             body.WakeUp();
             releaseTime = Time.time;
@@ -166,7 +176,15 @@ namespace Haunter
             if (speed < .65f) return;
             lastImpact = Time.time;
             Vector3 point = collision.contactCount > 0 ? collision.GetContact(0).point : transform.position;
-            NoiseSystem.Emit(point, Mathf.Clamp(.18f + speed * .1f, .28f, 1.5f), NoiseKind.Impact, gameObject);
+            var other = collision.collider.GetComponentInParent<ThrowableObject>();
+            if (other && releasedByPlayer && !other.releasedByPlayer) other.impactEventId = impactEventId;
+            if (other && other.releasedByPlayer && !releasedByPlayer) impactEventId = other.impactEventId;
+            if (impactEventId == 0)
+            {
+                impactEventId = other && other.impactEventId > 0 ? other.impactEventId : NoiseSystem.NewEventId();
+                if (other && other.impactEventId == 0) other.impactEventId = impactEventId;
+            }
+            NoiseSystem.Emit(point, Mathf.Clamp(.18f + speed * .1f, .28f, 1.5f), NoiseKind.Impact, gameObject, impactEventId);
         }
 
         void OnDestroy() { RestoreCarrierCollision(); }

@@ -210,8 +210,8 @@ namespace Haunter
             if (touch ? TouchControls.Pressed(TouchControls.Pickup) : Input.GetKeyDown(KeyCode.E))
             {
                 if (Allows(PlayerActions.Pickup) && HeldObject == null && NearbyObject != null) PickUp(NearbyObject);
-                else if (Allows(PlayerActions.Exit) && GameSession.Instance.Exit != null && HorizontalDistance(transform.position, GameSession.Instance.Exit.position) < 1.9f)
-                    GameSession.Instance.Escape();
+                else if (Allows(PlayerActions.Exit) && GameSession.Instance.PlayerNearExit(1.9f))
+                    GameSession.Instance.ReachExit();
             }
             if (touch ? TouchControls.Pressed(TouchControls.Cane) : Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(1)) TapCane();
             if (HeldObject == null)
@@ -292,6 +292,29 @@ namespace Haunter
         {
             ChargingThrow = false;
             ThrowCharge = 0f;
+        }
+
+        public void EnterLevel(Vector3 position)
+        {
+            if (HeldObject)
+            {
+                HeldObject.gameObject.SetActive(false);
+                Destroy(HeldObject.gameObject);
+            }
+            HeldObject = null;
+            NearbyObject = null;
+            CancelThrow();
+            controller.enabled = false;
+            transform.SetPositionAndRotation(position + Vector3.up * .04f, Quaternion.identity);
+            controller.height = 1.8f;
+            controller.center = Vector3.up * .9f;
+            controller.enabled = true;
+            pitch = gravityVelocity = walkedDistance = gait = tapAnimation = 0f;
+            lastTap = -10f;
+            IsCrouching = IsSprinting = false;
+            currentEyeHeight = 1.62f;
+            ViewCamera.transform.localPosition = Vector3.up * currentEyeHeight;
+            ViewCamera.transform.localRotation = Quaternion.identity;
         }
 
         public void GuideLookAt(Vector3 point, float blend)

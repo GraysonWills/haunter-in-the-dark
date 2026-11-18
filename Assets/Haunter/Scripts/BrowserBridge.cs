@@ -10,6 +10,12 @@ namespace Haunter
 #if UNITY_WEBGL && !UNITY_EDITOR
         [DllImport("__Internal")] static extern int Haunter_SmokeRequested();
         [DllImport("__Internal")] static extern int Haunter_TutorialSmokeRequested();
+        [DllImport("__Internal")] static extern int Haunter_ExpansionSmokeRequested();
+        [DllImport("__Internal")] static extern int Haunter_PreviewLevel();
+        [DllImport("__Internal")] static extern int Haunter_ObserverRequested();
+        [DllImport("__Internal")] static extern int Haunter_CaptureShot();
+        [DllImport("__Internal")] static extern int Haunter_CaptureReady();
+        [DllImport("__Internal")] static extern void Haunter_RecordCaptureState(string json);
         [DllImport("__Internal")] static extern int Haunter_DiagnosticsRequested();
         [DllImport("__Internal")] static extern int Haunter_HasPointerLock();
         [DllImport("__Internal")] static extern void Haunter_RequestPointerLock();
@@ -30,10 +36,17 @@ namespace Haunter
             public string heldObject, nearbyObject;
             public string tutorialStage;
             public bool tutorialFrozen;
+            public int level, primaryClaim, secondClaim;
+            public string levelName, objective, introStage, primaryBehavior, secondaryBehavior;
+            public float acousticLoad, hearingConfidence, secondDistractionSeconds;
+            public bool reducedDistortion, crossingCollapsed, quietZone, primaryReflection, secondaryDistracted;
+            public Vector3 primaryEstimate, primarySoundOrigin, secondaryPosition, routePoint,
+                primaryLure, secondaryLure, finalStaging;
         }
 
         bool diagnostics;
         bool smoke;
+        bool observer;
         static bool acquiredPointerLock;
         static float pointerLockRequestedAt;
         const float PointerLockGraceSeconds = 1f;
@@ -49,7 +62,8 @@ namespace Haunter
 
         void Awake()
         {
-            smoke = SmokeRequested || TutorialSmokeRequested;
+            smoke = SmokeRequested || TutorialSmokeRequested || ExpansionSmokeRequested || CaptureShot > 0;
+            observer = Haunter_ObserverRequested() != 0;
             diagnostics = Haunter_DiagnosticsRequested() != 0;
         }
 
@@ -57,6 +71,8 @@ namespace Haunter
         {
             var session = GameSession.Instance;
             if (!session) return;
+            if (observer && !session.GetComponent<HaunterDeveloperView>())
+                session.gameObject.AddComponent<HaunterDeveloperView>();
             TouchControls.Publish(session);
             bool locked = Haunter_HasPointerLock() != 0;
             if (!smoke && !TouchControls.Enabled && session.State == SessionState.Playing)
@@ -79,7 +95,8 @@ namespace Haunter
             {
                 state = session.State.ToString(), elapsedSeconds = session.ElapsedSeconds,
                 soundsMade = session.SoundsMade, activePulses = NoiseSystem.Instance ? NoiseSystem.Instance.ActivePulseCount : 0,
-                pointerLocked = locked, touchControls = TouchControls.Enabled, navigationReady = world && world.NavMeshReady,
+                pointerLocked = locked, touchControls = TouchControls.Enabled,
+                navigationReady = session.Campaign.Room ? session.Campaign.Room.NavMeshReady : world && world.NavMeshReady,
                 playerPosition = player.transform.position, playerRotation = player.transform.eulerAngles,
                 cameraRotation = player.ViewCamera ? player.ViewCamera.transform.eulerAngles : Vector3.zero,
                 exitPosition = session.Exit.position, creaturePosition = creature.transform.position,
@@ -90,8 +107,31 @@ namespace Haunter
                 creatureInvestigating = creature.IsInvestigating, creatureDistracted = creature.IsCommittedToDistraction,
                 creatureLingering = creature.IsLingeringAtDistraction, distractionSeconds = creature.DistractionTimeRemaining,
                 tutorialStage = session.Tutorial != null ? session.Tutorial.Stage.ToString() : "Inactive",
-                tutorialFrozen = session.Tutorial != null && session.Tutorial.WorldFrozen
+                tutorialFrozen = session.Tutorial != null && session.Tutorial.WorldFrozen,
+                level = session.LevelNumber, levelName = session.Campaign.Title, objective = session.Campaign.Objective,
+                introStage = session.Campaign.IntroStage, crossingCollapsed = session.Campaign.CrossingCollapsed,
+                quietZone = session.Campaign.Quiet, acousticLoad = NoiseSystem.Instance ? NoiseSystem.Instance.AcousticLoad : 0,
+                reducedDistortion = session.ReducedDistortion, routePoint = session.Campaign.Bearing,
+                primaryBehavior = creature.BehaviorName, primaryClaim = creature.ClaimedNoiseEventId,
+                primaryEstimate = creature.LastHeardPosition, primarySoundOrigin = creature.LastHeardOrigin,
+                primaryReflection = creature.LastHeardReflection, hearingConfidence = creature.HearingConfidence
             };
+            var second = session.Campaign.SecondCreature;
+            if (second)
+            {
+                snapshot.secondaryPosition = second.transform.position;
+                snapshot.secondaryBehavior = second.BehaviorName;
+                snapshot.secondClaim = second.ClaimedNoiseEventId;
+                snapshot.secondaryDistracted = second.IsCommittedToDistraction;
+                snapshot.secondDistractionSeconds = second.DistractionTimeRemaining;
+            }
+            var room = session.Campaign.Room;
+            if (room)
+            {
+                snapshot.primaryLure = room.PrimaryLure;
+                snapshot.secondaryLure = room.SecondaryLure;
+                snapshot.finalStaging = room.FinalStaging;
+            }
             Haunter_PublishState(JsonUtility.ToJson(snapshot));
         }
 #endif
@@ -103,13 +143,14 @@ namespace Haunter
             var session = GameSession.Instance;
             if (session == null) return;
             if (action == "begin") session.Begin();
+            else if (action == "distortion" && session.State == SessionState.Paused) session.ToggleDistortion();
             else if (action == "resume") session.Resume();
             else if (action == "skip")
             {
                 if (session.State == SessionState.Ready) session.Begin(true);
                 else if (session.State == SessionState.Paused)
                 {
-                    session.Tutorial.Skip();
+                    if (session.Tutorial.Active) session.Tutorial.Skip();
                     session.Resume();
                 }
             }
@@ -123,7 +164,7 @@ namespace Haunter
             pointerLockRequestedAt = Time.unscaledTime;
             // Use the Begin/Resume gesture's transient activation even when its key-up
             // has already happened before Unity processes this frame.
-            if (!TouchControls.Enabled && !SmokeRequested && !TutorialSmokeRequested) Haunter_RequestPointerLock();
+            if (!TouchControls.Enabled && !SmokeRequested && !TutorialSmokeRequested && !ExpansionSmokeRequested) Haunter_RequestPointerLock();
 #endif
         }
 
@@ -149,6 +190,63 @@ namespace Haunter
                 return false;
 #endif
             }
+        }
+
+        public static bool ExpansionSmokeRequested
+        {
+            get
+            {
+#if UNITY_WEBGL && !UNITY_EDITOR
+                return Haunter_ExpansionSmokeRequested() != 0;
+#else
+                return Array.IndexOf(Environment.GetCommandLineArgs(), "-haunterExpansionSmoke") >= 0;
+#endif
+            }
+        }
+
+        public static int PreviewLevel
+        {
+            get
+            {
+#if UNITY_WEBGL && !UNITY_EDITOR
+                return Haunter_PreviewLevel();
+#else
+                foreach (string arg in Environment.GetCommandLineArgs())
+                    if (arg.StartsWith("-haunterLevel=") && int.TryParse(arg.Substring(14), out int level)) return level;
+                return 0;
+#endif
+            }
+        }
+
+        public static int CaptureShot
+        {
+            get
+            {
+#if UNITY_WEBGL && !UNITY_EDITOR
+                return Haunter_CaptureShot();
+#else
+                return 0;
+#endif
+            }
+        }
+
+        public static bool CaptureReady
+        {
+            get
+            {
+#if UNITY_WEBGL && !UNITY_EDITOR
+                return Haunter_CaptureReady() != 0;
+#else
+                return false;
+#endif
+            }
+        }
+
+        public static void RecordCaptureState(string json)
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Haunter_RecordCaptureState(json);
+#endif
         }
 
         public static void RecordScreenshot(string name, string base64)

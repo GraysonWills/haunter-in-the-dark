@@ -1,9 +1,13 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 
 namespace Haunter
 {
-    /// <summary>Hunts movement by sound, then returns to protect the exit.</summary>
+    public enum ListenerRole { ExitGuard, Roamer }
+
+    /// <summary>Acts on audible evidence and returns to its assigned route or exit.</summary>
     [RequireComponent(typeof(NavMeshAgent))]
     public sealed class ListenerCreature : MonoBehaviour
     {
@@ -30,19 +34,57 @@ namespace Haunter
         public bool IsLingeringAtDistraction => mode == Behavior.DistractionLinger;
         public float DistractionTimeRemaining => IsLingeringAtDistraction ? Mathf.Max(0, listenRemaining) : 0;
         public float DistractionLingerSeconds => objectListenSeconds;
-        public bool IsReturningToExit => mode == Behavior.Returning;
-        public bool IsGuardingExit => mode == Behavior.Guarding;
+        public bool IsReturningToExit => Role == ListenerRole.ExitGuard && mode == Behavior.Returning;
+        public bool IsGuardingExit => Role == ListenerRole.ExitGuard && mode == Behavior.Guarding;
         public int TotalPawsteps { get; private set; }
         public bool TutorialHold { get; set; }
         public bool TutorialHearingSuppressed { get; set; }
         public GameObject TutorialImpactSource { get; set; }
+        public bool CatchSuppressed { get; set; }
+        public ListenerRole Role { get; private set; }
+        public int ClaimedNoiseEventId { get; private set; }
+        public Vector3 LastHeardPosition { get; private set; }
+        public Vector3 LastHeardOrigin { get; private set; }
+        public bool LastHeardReflection { get; private set; }
+        public bool HasHeardSound { get; private set; }
+        public float HearingConfidence => heardConfidence * Mathf.Clamp01(1f - (Time.time - heardAt) / 7f);
+        public int PatrolWaypointIndex { get; private set; } = -1;
+        public string BehaviorName => approachListening > 0f ? "Listening" :
+            mode == Behavior.Returning ? (Role == ListenerRole.Roamer ? "ReturningToPatrol" : "ReturningToExit") : mode.ToString();
+        public float TravelRemaining
+        {
+            get
+            {
+                if (agent == null || !agent.isOnNavMesh || !agent.hasPath) return 0;
+                float distance = agent.remainingDistance;
+                return float.IsInfinity(distance) || float.IsNaN(distance) ? 0 : distance;
+            }
+        }
 
-        enum Behavior { Guarding, Investigating, DistractionApproach, DistractionLinger, Returning }
+        enum Behavior { Guarding, Patrolling, Investigating, DistractionApproach, DistractionLinger, Returning }
         Behavior mode;
         Vector3 distractionDestination;
         float distractionTravelDeadline;
         float listenRemaining;
         float stalledTime;
+        float approachListening;
+        float heardAt;
+        float heardConfidence;
+        float patrolRetryAt;
+        bool navigationStarted;
+        bool scriptedInspection;
+        bool movedAroundDebris;
+        Quaternion inspectionFacing;
+        Vector3 returnDestination;
+        Vector3? explicitGuardAnchor;
+        Vector3[] patrol = Array.Empty<Vector3>();
+
+        const int RememberedEvents = 256;
+        const float PatrolSpeed = 2.45f;
+        const float RouteRetryDelay = .65f;
+        static readonly List<ListenerCreature> listeners = new List<ListenerCreature>(2);
+        static readonly HashSet<int> resolvedEvents = new HashSet<int>();
+        static readonly Queue<int> recentEvents = new Queue<int>(RememberedEvents);
 
         private NavMeshAgent agent;
         private float pawClock;
@@ -50,6 +92,7 @@ namespace Haunter
         private float idleClock;
         private int nextPaw;
         private readonly int[] pawOrder = { 0, 3, 1, 2 };
+        private float PawPeriod => pawInterval * (Role == ListenerRole.Roamer ? 1.23f : 1f);
         private static readonly Vector3[] SoundSearchOffsets =
         {
             Vector3.zero, Vector3.forward, Vector3.back, Vector3.left, Vector3.right,
@@ -125,22 +168,97 @@ namespace Haunter
         }
 
         private void Awake() { ConfigureAgent(); }
-        private void OnEnable() { NoiseSystem.Heard += Hear; }
-        private void OnDisable() { NoiseSystem.Heard -= Hear; }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetHearing()
+        {
+            NoiseSystem.Heard -= DispatchNoise;
+            listeners.Clear();
+            resolvedEvents.Clear();
+            recentEvents.Clear();
+        }
+
+        private void OnEnable()
+        {
+            if (listeners.Count == 0) NoiseSystem.Heard += DispatchNoise;
+            listeners.Add(this);
+        }
+
+        private void OnDisable()
+        {
+            listeners.Remove(this);
+            ClaimedNoiseEventId = 0;
+            if (listeners.Count == 0) ResetHearing();
+        }
+
+        public void ConfigurePatrol(Vector3[] waypoints)
+        {
+            if (waypoints == null || waypoints.Length < 2)
+                throw new ArgumentException("A patrol requires at least two waypoints.", nameof(waypoints));
+            patrol = (Vector3[])waypoints.Clone();
+            PatrolWaypointIndex = -1;
+            Role = ListenerRole.Roamer;
+            if (navigationStarted && agent.isOnNavMesh) ReturnToRole();
+        }
+
+        public void ConfigureGuard(Vector3 anchor)
+        {
+            Role = ListenerRole.ExitGuard;
+            explicitGuardAnchor = anchor;
+            patrol = Array.Empty<Vector3>();
+            PatrolWaypointIndex = -1;
+            if (navigationStarted && agent.isOnNavMesh)
+            {
+                UpdateGuardAnchor();
+                ReturnToRole();
+            }
+        }
 
         private void Start()
         {
-            if (NavMesh.SamplePosition(transform.position, out var hit, 3f, NavMesh.AllAreas)) transform.position = hit.position;
-            agent.enabled = true;
-            if (NavMesh.SamplePosition(transform.position, out hit, 3f, NavMesh.AllAreas)) agent.Warp(hit.position);
-            if (agent.isOnNavMesh) agent.isStopped = true;
+            SetNavigationActive(true);
             TargetPosition = transform.position;
-            Vector3 desiredGuard = GameSession.Instance != null && GameSession.Instance.Exit != null
-                ? GameSession.Instance.Exit.position + guardOffset : transform.position;
-            GuardPosition = NavMesh.SamplePosition(desiredGuard, out hit, 2f, NavMesh.AllAreas)
-                ? hit.position : transform.position;
+            UpdateGuardAnchor();
+            navigationStarted = true;
             mode = Behavior.Guarding;
             idleClock = 4f;
+            if (Role == ListenerRole.Roamer && agent.isOnNavMesh) ReturnToRole();
+        }
+
+        public void SetNavigationActive(bool active)
+        {
+            if (!active)
+            {
+                if (agent.isOnNavMesh)
+                {
+                    agent.isStopped = true;
+                    agent.ResetPath();
+                }
+                agent.enabled = false;
+                return;
+            }
+            if (!NavMesh.SamplePosition(transform.position, out var hit, 3f, NavMesh.AllAreas))
+            {
+                agent.enabled = false;
+                return;
+            }
+            transform.position = hit.position;
+            agent.enabled = true;
+            if (!agent.Warp(hit.position)) return;
+            agent.isStopped = true;
+            if (navigationStarted)
+            {
+                UpdateGuardAnchor();
+                ReturnToRole();
+            }
+        }
+
+        void UpdateGuardAnchor()
+        {
+            var exit = GameSession.Instance != null ? GameSession.Instance.Exit : null;
+            Vector3 desiredGuard = explicitGuardAnchor ?? (exit != null ? exit.position + guardOffset : transform.position);
+            GuardPosition = NavMesh.SamplePosition(desiredGuard, out var hit, 2f, NavMesh.AllAreas)
+                ? hit.position : transform.position;
         }
 
         public float HearingRange(NoiseKind kind, float loudness)
@@ -160,17 +278,26 @@ namespace Haunter
         public bool BeginTutorialPursuit(Vector3 target)
         {
             if (agent == null || !agent.isOnNavMesh || !TrySoundPath(target, out var path)) return false;
+            if (!agent.SetPath(path)) return false;
             TargetPosition = target;
             mode = Behavior.Investigating;
             RemainingSteps = 100;
             listenRemaining = 0;
+            approachListening = 0;
+            ClaimedNoiseEventId = 0;
             pawClock = 0;
             stalledTime = 0;
             idleClock = 0;
             agent.speed = movementSpeed;
-            agent.SetPath(path);
             agent.isStopped = false;
             return true;
+        }
+
+        public bool BeginScriptedInvestigation(Vector3 target, bool charge = true)
+        {
+            if (agent == null || !agent.isOnNavMesh || !TrySoundPath(target, out var path)) return false;
+            var evidence = new NoiseEvent { Position = target, OriginalPosition = target, Confidence = 1f, Kind = NoiseKind.Impact };
+            return AcceptNoise(evidence, path, charge ? movementSpeed : PatrolSpeed, scripted: true);
         }
 
         public void ReleaseTutorialControl(bool returnToExit)
@@ -178,22 +305,66 @@ namespace Haunter
             TutorialHold = false;
             TutorialHearingSuppressed = false;
             TutorialImpactSource = null;
-            if (returnToExit && agent != null && agent.isOnNavMesh) ReturnToExit();
+            if (returnToExit && agent != null && agent.isOnNavMesh) ReturnToRole();
         }
 
-        private void Hear(NoiseEvent noise)
+        static void DispatchNoise(NoiseEvent noise)
         {
-            if (TutorialImpactSource != null && (noise.Kind != NoiseKind.Impact || noise.Source != TutorialImpactSource)) return;
-            if (TutorialHold || TutorialHearingSuppressed) return;
             if (GameSession.Instance == null || GameSession.Instance.State != SessionState.Playing) return;
-            if (noise.Kind == NoiseKind.Creature || noise.Kind == NoiseKind.Intro) return;
-            if (noise.Source == gameObject || (noise.Source != null && noise.Source.transform.IsChildOf(transform))) return;
-            // An accepted distraction owns attention until arrival and a full inspection.
-            // Drop intervening noises: neither footsteps nor bounces can redirect or extend it.
-            if (IsCommittedToDistraction) return;
-            if (!agent.isOnNavMesh || Vector3.Distance(transform.position, noise.Position) > HearingRange(noise.Kind, noise.Loudness)) return;
-            if (!TrySoundPath(noise.Position, out var path)) return;
+            if (noise.Kind != NoiseKind.Footstep && noise.Kind != NoiseKind.Cane && noise.Kind != NoiseKind.Impact) return;
+            if (noise.EventId > 0 && resolvedEvents.Contains(noise.EventId)) return;
+
+            ListenerCreature best = null;
+            NavMeshPath bestPath = null;
+            float bestCost = float.PositiveInfinity;
+            foreach (var listener in listeners)
+            {
+                if (noise.EventId > 0 && listener.ClaimedNoiseEventId == noise.EventId) return;
+                if (!listener.CanHear(noise) || !listener.TrySoundPath(noise.Position, out var path)) continue;
+                // Favor a reachable approach. A roaming creature wins close calls, while
+                // the exit guard still leaves its post for nearby lures or when alone.
+                float cost = PathDistance(path, listener.transform.position)
+                    + (listener.Role == ListenerRole.ExitGuard ? .8f : 0f);
+                if (cost >= bestCost) continue;
+                best = listener;
+                bestPath = path;
+                bestCost = cost;
+            }
+            if (best == null || !best.AcceptNoise(noise, bestPath, best.movementSpeed) || noise.EventId <= 0) return;
+
+            // Completion releases the live claim but echoes and bounces from that same
+            // event cannot open another claim. Keep the bounded history for delayed arrivals.
+            if (recentEvents.Count == RememberedEvents) resolvedEvents.Remove(recentEvents.Dequeue());
+            recentEvents.Enqueue(noise.EventId);
+            resolvedEvents.Add(noise.EventId);
+        }
+
+        bool CanHear(NoiseEvent noise)
+        {
+            if (TutorialImpactSource != null && (noise.Kind != NoiseKind.Impact || noise.Source != TutorialImpactSource)) return false;
+            if (TutorialHold || TutorialHearingSuppressed || IsCommittedToDistraction || !agent.isOnNavMesh) return false;
+            if (noise.Source == gameObject || (noise.Source != null && noise.Source.transform.IsChildOf(transform))) return false;
+            if (noise.Kind != NoiseKind.Impact && NoiseConfidence(noise) < .55f && Time.time - heardAt < .75f && HasHeardSound)
+                return false;
+            return Vector3.Distance(transform.position, noise.Position) <= HearingRange(noise.Kind, noise.Loudness);
+        }
+
+        static float NoiseConfidence(NoiseEvent noise) => noise.EventId > 0 ? Mathf.Clamp01(noise.Confidence) : 1f;
+
+        bool AcceptNoise(NoiseEvent noise, NavMeshPath path, float speed, bool scripted = false)
+        {
+            if (!agent.SetPath(path)) return false;
+            scriptedInspection = scripted;
+            movedAroundDebris = false;
             TargetPosition = noise.Position;
+            HasHeardSound = true;
+            LastHeardPosition = noise.Position;
+            LastHeardOrigin = noise.EventId > 0 ? noise.OriginalPosition : noise.Position;
+            LastHeardReflection = noise.IsReflection;
+            heardAt = Time.time;
+            heardConfidence = NoiseConfidence(noise);
+            approachListening = heardConfidence < .65f ? Mathf.Lerp(.85f, .2f, heardConfidence) : 0f;
+            ClaimedNoiseEventId = noise.EventId;
             if (noise.Kind == NoiseKind.Impact)
             {
                 // A real lure can interrupt a fresh player pursuit. Its travel is path-based,
@@ -202,7 +373,7 @@ namespace Haunter
                 RemainingSteps = 0;
                 var corners = path.corners;
                 distractionDestination = corners.Length > 0 ? corners[corners.Length - 1] : transform.position;
-                distractionTravelDeadline = Time.time + 12f;
+                distractionTravelDeadline = Time.time + Mathf.Max(12f, PathDistance(path, transform.position) / speed + 3f);
             }
             else
             {
@@ -214,10 +385,21 @@ namespace Haunter
             listenRemaining = 0;
             pawClock = 0;
             stalledTime = 0;
-            agent.speed = movementSpeed;
-            agent.SetPath(path);
-            agent.isStopped = false;
+            agent.speed = speed;
+            agent.isStopped = approachListening > 0f;
             idleClock = 0;
+            return true;
+        }
+
+        static float PathDistance(NavMeshPath path, Vector3 start)
+        {
+            float length = 0f;
+            foreach (Vector3 corner in path.corners)
+            {
+                length += Vector3.Distance(start, corner);
+                start = corner;
+            }
+            return length;
         }
 
         private bool TrySoundPath(Vector3 sound, out NavMeshPath path)
@@ -244,124 +426,166 @@ namespace Haunter
         private void Update()
         {
             if (agent == null || !agent.isOnNavMesh) return;
-            if (TutorialHold || Time.timeScale <= 0f)
-            {
-                agent.isStopped = true;
-                return;
-            }
-            if (GameSession.Instance == null || GameSession.Instance.State != SessionState.Playing)
+            if (TutorialHold || Time.timeScale <= 0f || GameSession.Instance == null
+                || GameSession.Instance.State != SessionState.Playing)
             {
                 agent.isStopped = true;
                 return;
             }
 
-            // A changed/blocked navigation route must not leave an unbreakable distraction.
-            if (mode == Behavior.DistractionApproach && Time.time >= distractionTravelDeadline) ReturnToExit();
+            if (approachListening > 0f)
+            {
+                approachListening = Mathf.Max(0f, approachListening - Time.deltaTime);
+                agent.isStopped = true;
+                Face(TargetPosition - transform.position, 4f);
+            }
+            else if (mode == Behavior.DistractionApproach || (mode == Behavior.Investigating && RemainingSteps > 0))
+                UpdateApproach();
+            else if (mode == Behavior.DistractionLinger || mode == Behavior.Investigating)
+                UpdateInspection();
+            else if (mode == Behavior.Returning || mode == Behavior.Patrolling)
+                UpdateRoute();
+            else UpdateGuard();
 
-            if ((mode == Behavior.Investigating && RemainingSteps > 0) || mode == Behavior.DistractionApproach)
-            {
-                agent.isStopped = false;
-                if (!agent.pathPending && (!agent.hasPath || agent.remainingDistance <= agent.stoppingDistance + .08f))
-                {
-                    if (mode == Behavior.DistractionApproach
-                        && PlayerController.HorizontalDistance(transform.position, distractionDestination) > .8f)
-                        ReturnToExit();
-                    else FinishSoundInvestigation();
-                }
-                else
-                {
-                    if (agent.velocity.sqrMagnitude > .025f)
-                    {
-                        stalledTime = 0;
-                        pawClock += Time.deltaTime;
-                        if (pawClock >= pawInterval)
-                        {
-                            pawClock -= pawInterval;
-                            int paw = pawOrder[nextPaw++ % 4];
-                            Pawfall(paw, .62f);
-                            if (mode == Behavior.Investigating)
-                            {
-                                RemainingSteps--;
-                                if (RemainingSteps <= 0) FinishSoundInvestigation();
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // A blocked path must not leave an indefinitely armed movement budget.
-                        stalledTime += Time.deltaTime;
-                        if (stalledTime > 1.5f)
-                        {
-                            if (mode == Behavior.DistractionApproach) ReturnToExit();
-                            else FinishSoundInvestigation();
-                        }
-                    }
-                }
-            }
-            else if (mode == Behavior.Investigating || mode == Behavior.DistractionLinger)
-            {
-                agent.isStopped = true;
-                listenRemaining -= Time.deltaTime;
-                if (mode == Behavior.DistractionLinger)
-                {
-                    idleClock += Time.deltaTime;
-                    if (idleClock >= 1.4f)
-                    {
-                        idleClock = 0;
-                        Pawfall(pawOrder[nextPaw++ % 4], .34f);
-                    }
-                }
-                if (listenRemaining <= 0) ReturnToExit();
-            }
-            else if (mode == Behavior.Returning)
-            {
-                agent.isStopped = false;
-                if (!agent.pathPending && agent.hasPath && agent.remainingDistance > .55f)
-                {
-                    pawClock += Time.deltaTime;
-                    if (agent.velocity.sqrMagnitude > .025f)
-                    {
-                        stalledTime = 0;
-                        if (pawClock >= pawInterval)
-                        {
-                            pawClock %= pawInterval;
-                            Pawfall(pawOrder[nextPaw++ % 4], .62f);
-                        }
-                    }
-                    else stalledTime += Time.deltaTime;
-                    if (stalledTime > 2f) ReturnToExit();
-                }
-                else if (!agent.pathPending)
-                {
-                    if (PlayerController.HorizontalDistance(transform.position, GuardPosition) <= .9f)
-                    {
-                        mode = Behavior.Guarding;
-                        agent.isStopped = true;
-                        agent.ResetPath();
-                        idleClock = 0;
-                    }
-                    else ReturnToExit();
-                }
-            }
-            else
-            {
-                agent.isStopped = true;
-                if (PlayerController.HorizontalDistance(transform.position, GuardPosition) > .9f) ReturnToExit();
-                idleClock += Time.deltaTime;
-                if (idleClock > 7.5f)
-                {
-                    idleClock = 0;
-                    Pawfall(pawOrder[nextPaw++ % 4], .34f);
-                }
-                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(Vector3.back), Time.deltaTime * 2f);
-            }
-            Vector3 velocity = agent.desiredVelocity;
-            velocity.y = 0;
-            if (!agent.isStopped && velocity.sqrMagnitude > .01f)
-                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(velocity), Time.deltaTime * 10);
+            if (!agent.isStopped) Face(agent.desiredVelocity, 10f);
             if (agent.velocity.sqrMagnitude > .025f) gaitClock += Time.deltaTime;
             AnimateLegs(agent.velocity.magnitude / movementSpeed);
             CheckCatch();
+        }
+
+        void UpdateApproach()
+        {
+            bool distraction = mode == Behavior.DistractionApproach;
+            if (distraction && Time.time >= distractionTravelDeadline)
+            {
+                ReturnToRole();
+                return;
+            }
+            agent.isStopped = false;
+            if (agent.pathPending) return;
+            if (!agent.hasPath || agent.remainingDistance <= agent.stoppingDistance + .08f)
+            {
+                if (distraction && Vector3.Distance(transform.position, distractionDestination) > .8f) ReturnToRole();
+                else FinishSoundInvestigation();
+                return;
+            }
+            if (TrackPawsteps(.62f) && !distraction && --RemainingSteps <= 0) FinishSoundInvestigation();
+            if (stalledTime <= 1.5f) return;
+            if (distraction) ReturnToRole();
+            else FinishSoundInvestigation();
+        }
+
+        void UpdateInspection()
+        {
+            listenRemaining -= Time.deltaTime;
+            if (listenRemaining <= 0f)
+            {
+                ReturnToRole();
+                return;
+            }
+            if (mode != Behavior.DistractionLinger)
+            {
+                agent.isStopped = true;
+                return;
+            }
+
+            // The courtyard's scripted inspection takes one short step round the debris.
+            // The inspection clock starts at its first arrival and keeps running throughout.
+            if (scriptedInspection && !movedAroundDebris && listenRemaining < objectListenSeconds - 1.5f)
+            {
+                movedAroundDebris = true;
+                var side = transform.position + (inspectionFacing * Vector3.right) * 1.15f;
+                if (TryWaypointPath(side, out var path) && PathDistance(path, transform.position) <= 1.65f)
+                {
+                    agent.speed = PatrolSpeed * .65f;
+                    agent.SetPath(path);
+                    agent.isStopped = false;
+                }
+            }
+            if (agent.hasPath && agent.remainingDistance > agent.stoppingDistance + .08f)
+            {
+                agent.isStopped = false;
+                TrackPawsteps(.42f);
+                return;
+            }
+            agent.isStopped = true;
+            idleClock += Time.deltaTime;
+            if (idleClock >= 1.4f)
+            {
+                idleClock = 0;
+                Pawfall(pawOrder[nextPaw++ % 4], .34f);
+            }
+            if (scriptedInspection)
+            {
+                var glance = Quaternion.Euler(0, Mathf.Sin(listenRemaining * 3f) * 29f, 0) * inspectionFacing;
+                transform.rotation = Quaternion.Slerp(transform.rotation, glance, Time.deltaTime * 4f);
+            }
+        }
+
+        void UpdateRoute()
+        {
+            if (agent.pathPending) return;
+            if (agent.hasPath && agent.remainingDistance > .55f)
+            {
+                agent.isStopped = false;
+                TrackPawsteps(Role == ListenerRole.Roamer && mode == Behavior.Patrolling ? .5f : .62f);
+                if (stalledTime > 2f)
+                {
+                    if (mode == Behavior.Patrolling) BeginNextPatrolWaypoint();
+                    else ReturnToRole();
+                }
+                return;
+            }
+            if (Time.time < patrolRetryAt) return;
+            if (Role == ListenerRole.Roamer)
+            {
+                if (mode == Behavior.Patrolling || Vector3.Distance(transform.position, returnDestination) <= .9f)
+                    BeginNextPatrolWaypoint();
+                else ReturnToRole();
+            }
+            else if (Vector3.Distance(transform.position, GuardPosition) <= .9f)
+            {
+                mode = Behavior.Guarding;
+                agent.isStopped = true;
+                agent.ResetPath();
+                idleClock = 0;
+            }
+            else ReturnToRole();
+        }
+
+        void UpdateGuard()
+        {
+            agent.isStopped = true;
+            if (Vector3.Distance(transform.position, GuardPosition) > .9f) ReturnToRole();
+            idleClock += Time.deltaTime;
+            if (idleClock > 7.5f)
+            {
+                idleClock = 0;
+                Pawfall(pawOrder[nextPaw++ % 4], .34f);
+            }
+            Face(Vector3.back, 2f);
+        }
+
+        bool TrackPawsteps(float loudness)
+        {
+            if (agent.velocity.sqrMagnitude <= .025f)
+            {
+                stalledTime += Time.deltaTime;
+                return false;
+            }
+            stalledTime = 0;
+            pawClock += Time.deltaTime;
+            if (pawClock < PawPeriod) return false;
+            pawClock %= PawPeriod;
+            Pawfall(pawOrder[nextPaw++ % 4], loudness);
+            return true;
+        }
+
+        void Face(Vector3 direction, float response)
+        {
+            direction.y = 0;
+            if (direction.sqrMagnitude > .01f)
+                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(direction), Time.deltaTime * response);
         }
 
         private void FinishSoundInvestigation()
@@ -377,43 +601,103 @@ namespace Haunter
                 mode = Behavior.DistractionLinger;
                 listenRemaining = objectListenSeconds;
                 idleClock = 0;
+                inspectionFacing = transform.rotation;
             }
             else listenRemaining = .6f;
         }
 
-        private void ReturnToExit()
+        private void ReturnToRole()
         {
             RemainingSteps = 0;
             listenRemaining = 0;
+            approachListening = 0;
+            ClaimedNoiseEventId = 0;
             pawClock = 0;
             stalledTime = 0;
             mode = Behavior.Returning;
             agent.speed = returnSpeed;
-            if (TrySoundPath(GuardPosition, out var path))
+            if (Role == ListenerRole.ExitGuard && TrySoundPath(GuardPosition, out var guardPath))
             {
-                agent.SetPath(path);
-                agent.isStopped = false;
+                if (SetRoute(guardPath)) return;
             }
-            else agent.isStopped = true;
+            else if (Role == ListenerRole.Roamer && TryFindReturnWaypoint(out var path))
+            {
+                if (SetRoute(path)) return;
+            }
+            agent.ResetPath();
+            agent.isStopped = true;
+            patrolRetryAt = Time.time + RouteRetryDelay;
+        }
+
+        bool TryFindReturnWaypoint(out NavMeshPath nearestPath)
+        {
+            nearestPath = null;
+            float nearestDistance = float.PositiveInfinity;
+            for (int i = 0; i < patrol.Length; ++i)
+            {
+                if (!TryWaypointPath(patrol[i], out var path)) continue;
+                float distance = PathDistance(path, transform.position);
+                if (distance >= nearestDistance) continue;
+                nearestDistance = distance;
+                nearestPath = path;
+                PatrolWaypointIndex = i;
+            }
+            return nearestPath != null;
+        }
+
+        void BeginNextPatrolWaypoint()
+        {
+            mode = Behavior.Patrolling;
+            agent.speed = PatrolSpeed;
+            for (int offset = 1; offset <= patrol.Length; ++offset)
+            {
+                int next = (PatrolWaypointIndex + offset) % patrol.Length;
+                if (!TryWaypointPath(patrol[next], out var path) || !SetRoute(path)) continue;
+                PatrolWaypointIndex = next;
+                return;
+            }
+            agent.ResetPath();
+            agent.isStopped = true;
+            patrolRetryAt = Time.time + RouteRetryDelay;
+        }
+
+        bool TryWaypointPath(Vector3 waypoint, out NavMeshPath path)
+        {
+            path = null;
+            if (!NavMesh.SamplePosition(waypoint, out var hit, 1.45f, NavMesh.AllAreas)) return false;
+            path = new NavMeshPath();
+            return agent.CalculatePath(hit.position, path) && path.status == NavMeshPathStatus.PathComplete;
+        }
+
+        bool SetRoute(NavMeshPath path)
+        {
+            var corners = path.corners;
+            if (!agent.SetPath(path)) return false;
+            returnDestination = corners.Length > 0 ? corners[corners.Length - 1] : transform.position;
+            agent.isStopped = false;
+            stalledTime = 0;
+            patrolRetryAt = 0;
+            return true;
         }
 
         private void Pawfall(int index, float loudness)
         {
             TotalPawsteps++;
             Vector3 point = paws[index] != null ? paws[index].position : transform.position;
-            point.y = .05f;
-            NoiseSystem.Emit(point, loudness, NoiseKind.Creature, gameObject);
+            point.y = transform.position.y + .05f;
+            NoiseSystem.Emit(point, loudness * (Role == ListenerRole.Roamer ? .86f : 1f), NoiseKind.Creature, gameObject);
         }
 
         private void CheckCatch()
         {
             var session = GameSession.Instance;
-            if (player == null || session == null) return;
+            if (player == null || session == null || CatchSuppressed) return;
             // The thrown prop still takes real flight time to distract the creature, while
             // this lesson locks player movement. Do not punish that forced observation;
             // ordinary proximity capture resumes as soon as the crouch lesson begins.
             if (session.Tutorial != null && session.Tutorial.Stage == TutorialStage.WatchDistraction) return;
             Vector3 offset = player.position - transform.position;
+            if (Mathf.Abs(offset.y) > 1.25f) return;
             offset.y = 0;
             if (offset.sqrMagnitude > 1.1f * 1.1f) return;
             Vector3 eye = transform.position + Vector3.up * .9f;
@@ -425,7 +709,7 @@ namespace Haunter
         {
             if (torso == null) return;
             float amplitude = Mathf.Clamp01(speed);
-            float phase = gaitClock / (pawInterval * 4f) * Mathf.PI * 2f + Mathf.PI * .5f;
+            float phase = gaitClock / (PawPeriod * 4f) * Mathf.PI * 2f + Mathf.PI * .5f;
             for (int i = 0; i < 4; i++)
             {
                 if (paws[i] == null || upperLegs[i] == null || lowerLegs[i] == null) continue;
@@ -441,7 +725,12 @@ namespace Haunter
                 Limb(lowerLegs[i], knee, foot + Vector3.up * .04f, .085f);
             }
             torso.localPosition = new Vector3(0, 1.09f + Mathf.Sin(phase * 2f) * .027f * amplitude, 0);
-            if (head != null) head.localRotation = Quaternion.Euler(0, Mathf.Sin(Time.time * .8f) * (RemainingSteps > 0 ? 3f : 13f), 0);
+            if (head != null)
+            {
+                float pitch = IsLingeringAtDistraction ? 12f + Mathf.Sin(Time.time * 2f) * 8f : 0f;
+                float yaw = Mathf.Sin(Time.time * .8f) * (RemainingSteps > 0 ? 3f : 13f);
+                head.localRotation = Quaternion.Euler(pitch, yaw, 0);
+            }
         }
 
         private static void Limb(Transform limb, Vector3 start, Vector3 end, float radius)

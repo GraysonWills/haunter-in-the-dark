@@ -13,6 +13,9 @@ namespace Haunter
         public Transform Exit;
         public ListenerCreature Creature;
         public TutorialDirector Tutorial { get; private set; }
+        public HaunterCampaign Campaign { get; private set; }
+        public int LevelNumber => Campaign ? Campaign.Level : 1;
+        public bool ReducedDistortion { get; private set; }
         public SessionState State { get; private set; } = SessionState.Ready;
         public float ElapsedSeconds { get; private set; }
         public int SoundsMade { get; private set; }
@@ -30,13 +33,16 @@ namespace Haunter
             Instance = this;
             Tutorial = GetComponent<TutorialDirector>();
             if (Tutorial == null) Tutorial = gameObject.AddComponent<TutorialDirector>();
+            Campaign = gameObject.AddComponent<HaunterCampaign>();
+            Campaign.Initialize(this);
+            ReducedDistortion = PlayerPrefs.GetInt("haunter.reducedDistortion", 0) != 0;
             State = SessionState.Ready;
             Time.timeScale = 0f;
             SetCursor(false);
         }
 
-        void OnEnable() { NoiseSystem.Heard += OnNoise; }
-        void OnDisable() { NoiseSystem.Heard -= OnNoise; }
+        void OnEnable() { NoiseSystem.Emitted += OnNoise; }
+        void OnDisable() { NoiseSystem.Emitted -= OnNoise; }
 
         void OnDestroy()
         {
@@ -72,6 +78,8 @@ namespace Haunter
             State = SessionState.Playing;
             Time.timeScale = 1f;
             SetCursor(true);
+            int preview = BrowserBridge.PreviewLevel;
+            if (preview > 1 && Campaign.Enter(preview)) return;
             if (skipTutorial) Tutorial.Skip();
             else Tutorial.StartTutorial();
             if (Player != null) NoiseSystem.Emit(Player.transform.position + Vector3.up * .03f, 1.1f, NoiseKind.Intro, Player.gameObject);
@@ -91,6 +99,28 @@ namespace Haunter
             State = SessionState.Escaped;
             Time.timeScale = 0f;
             SetCursor(false);
+        }
+
+        public bool PlayerNearExit(float radius)
+        {
+            return Player && Exit && Mathf.Abs(Player.transform.position.y - Exit.position.y) < 1.05f
+                && PlayerController.HorizontalDistance(Player.transform.position, Exit.position) < radius;
+        }
+
+        public void ReachExit()
+        {
+            if (State != SessionState.Playing) return;
+            bool legacyTest = LevelNumber == 1 &&
+                (FindFirstObjectByType<PrototypeSmokeTest>() || FindFirstObjectByType<TutorialSmokeTest>());
+            if (legacyTest || LevelNumber == 4) { Escape(); return; }
+            if (!Campaign.Enter(LevelNumber + 1)) Debug.LogError("Haunter: the next level could not be loaded.");
+        }
+
+        public void ToggleDistortion()
+        {
+            ReducedDistortion = !ReducedDistortion;
+            PlayerPrefs.SetInt("haunter.reducedDistortion", ReducedDistortion ? 1 : 0);
+            PlayerPrefs.Save();
         }
 
         public void Pause()
@@ -120,7 +150,7 @@ namespace Haunter
 
         void OnApplicationFocus(bool focused)
         {
-            if (FindFirstObjectByType<PrototypeSmokeTest>() != null || FindFirstObjectByType<TutorialSmokeTest>() != null) return;
+            if (BrowserBridge.ExpansionSmokeRequested || FindFirstObjectByType<PrototypeSmokeTest>() != null || FindFirstObjectByType<TutorialSmokeTest>() != null) return;
             // HTML touch buttons can take focus from the canvas without leaving the game.
             // The touch bridge pauses on actual window blur / document visibility loss.
             if (TouchControls.Enabled) return;
@@ -140,11 +170,12 @@ namespace Haunter
 
         void OnNoise(NoiseEvent noise)
         {
-            if (State != SessionState.Playing || noise.Kind == NoiseKind.Creature || noise.Kind == NoiseKind.Intro) return;
+            if (State != SessionState.Playing || noise.IsReflection || noise.Kind == NoiseKind.Creature || noise.Kind == NoiseKind.Intro) return;
             SoundsMade++;
             lastNoiseAt = Time.time;
             lastLoudness = noise.Loudness;
-            lastSound = noise.Kind == NoiseKind.Cane ? "CANE TAP" : noise.Kind == NoiseKind.Impact ? "OBJECT IMPACT" : "FOOTSTEP";
+            lastSound = noise.Kind == NoiseKind.Cane ? "CANE TAP" : noise.Kind == NoiseKind.Impact ? "OBJECT IMPACT"
+                : noise.Kind == NoiseKind.Collapse ? "STRUCTURE COLLAPSE" : "FOOTSTEP";
         }
 
         void PrepareStyles()
@@ -195,7 +226,7 @@ namespace Haunter
             Matrix4x4 before = GUI.matrix;
             Color colorBefore = GUI.color;
             GUI.matrix = Matrix4x4.Scale(new Vector3(Screen.width / Width, Screen.height / Height, 1f));
-            if (State == SessionState.Playing) DrawHud();
+            if (State == SessionState.Playing) { if (!HaunterDeveloperView.IsActive) DrawHud(); }
             else if (State == SessionState.Ready) DrawIntro();
             else if (State == SessionState.Paused) DrawPause();
             else DrawOutcome();
@@ -231,18 +262,18 @@ namespace Haunter
         {
             // Restrained black panels keep the objective readable over very bright overlapping waves.
             Fill(new Rect(594, 17, 412, 120), .7f, false);
-            Text(new Rect(48, 40, 330, 24), "H A U N T E R  /  I N  T H E  D A R K", small, .48f);
-            GUI.Label(new Rect(610, 26, 380, 28), "FIND THE EXIT", objective);
+            Text(new Rect(48, 40, 330, 24), "LEVEL " + LevelNumber + "  /  " + Campaign.Title, small, .65f);
+            GUI.Label(new Rect(595, 26, 410, 28), Campaign.Objective, objective);
             if (Player != null && Exit != null)
             {
-                Vector3 toExit = Exit.position - Player.transform.position;
+                Vector3 toExit = Campaign.Bearing - Player.transform.position;
                 toExit.y = 0;
                 Vector3 forward = Player.transform.forward;
                 forward.y = 0;
                 float angle = Vector3.SignedAngle(forward, toExit, Vector3.up);
                 DrawArrow(new Vector2(800, 86), angle, .9f);
                 Text(new Rect(850, 74, 130, 28), toExit.magnitude.ToString("0.0") + " M", label, .7f);
-                Text(new Rect(623, 77, 120, 22), "EXIT BEARING", small, .4f);
+                Text(new Rect(623, 77, 120, 22), LevelNumber == 2 ? "ROUTE BEARING" : "EXIT BEARING", small, .4f);
             }
             DrawCrosshair(new Vector2(800, 450));
             if (Player != null)
@@ -250,7 +281,7 @@ namespace Haunter
                 string prompt = string.Empty;
                 if (Player.HeldObject != null) prompt = (TouchControls.Enabled ? "HOLD THROW  /  TAP DROP     " : "HOLD LMB  THROW / Q  DROP     ") + Player.HeldObject.DisplayName.ToUpperInvariant();
                 else if (Player.NearbyObject != null) prompt = (TouchControls.Enabled ? "TAP PICK UP     " : "E  PICK UP ") + Player.NearbyObject.DisplayName.ToUpperInvariant();
-                else if (Exit != null && PlayerController.HorizontalDistance(Player.transform.position, Exit.position) < 2.2f) prompt = TouchControls.Enabled ? "TAP EXIT TO LEAVE THE ARCHIVE" : "E  LEAVE THE ARCHIVE";
+                else if (PlayerNearExit(2.2f)) prompt = (TouchControls.Enabled ? "TAP EXIT" : "E  CONTINUE") + "  /  " + Campaign.Title;
                 if (!string.IsNullOrEmpty(prompt) && (Tutorial == null || !Tutorial.Active))
                 {
                     Fill(new Rect(500, 526, 600, 45), .72f, false);
@@ -281,8 +312,17 @@ namespace Haunter
                 Fill(new Rect(1277 + i * 14, 866 - height, 6, height), alpha);
             }
             if (Tutorial != null && Tutorial.Active) DrawTutorial();
-            else if (ElapsedSeconds < 12)
+            else if (LevelNumber == 1 && ElapsedSeconds < 12)
                 Text(new Rect(480, 830, 640, 35), "Throw to distract it. It will linger there. Crouch past.", centered, Mathf.Clamp01((12f - ElapsedSeconds) / 2f) * .65f);
+            if (LevelNumber == 3 && NoiseSystem.Instance)
+                Text(new Rect(1110, 92, 390, 30), Campaign.Quiet ? "QUIET ALCOVE" :
+                    "ECHO OVERLAP  " + Mathf.RoundToInt(NoiseSystem.Instance.AcousticLoad * 100) + "%", small, .7f);
+            if (!TouchControls.Enabled && !string.IsNullOrEmpty(Campaign.Hint))
+            {
+                Fill(new Rect(320, 650, 960, 106), .86f, false);
+                GUI.Label(new Rect(345, 665, 910, 30), Campaign.HintHeading, tutorialHeading);
+                Text(new Rect(345, 700, 910, 43), Campaign.Hint, tutorialCopy, .9f);
+            }
         }
 
         void DrawTutorial()
@@ -332,6 +372,8 @@ namespace Haunter
                 Tutorial.Skip();
                 Resume();
             }
+            if (DrawButton(new Rect(110, LevelNumber == 1 && Tutorial.Active ? 726 : 660, 330, 36),
+                "REDUCED DISTORTION  /  " + (ReducedDistortion ? "ON" : "OFF"))) ToggleDistortion();
             DrawEchoArtwork(new Vector2(1180, 460));
             Text(new Rect(110, 775, 900, 30), "SPACE / RMB  CANE     E  PICK UP     HOLD LMB  THROW     Q  DROP", small, .55f);
             Text(new Rect(110, 811, 1000, 30), "WASD  MOVE     " + PlayerController.CrouchKeys + "  CROUCH     " + PlayerController.SprintKeys + "  RUN     MOUSE  LOOK", small, .55f);
@@ -341,7 +383,7 @@ namespace Haunter
         {
             bool escaped = State == SessionState.Escaped;
             Fill(new Rect(0, 0, Width, Height), 1f, false);
-            Text(new Rect(110, 140, 800, 30), escaped ? "THE ARCHIVE FALLS SILENT" : "SOMETHING HEARD YOU", label, .5f);
+            Text(new Rect(110, 140, 800, 30), escaped ? "THE BUILDINGS FALL SILENT" : "SOMETHING HEARD YOU", label, .5f);
             GUI.Label(new Rect(103, 245, 1250, 115), escaped ? "YOU FOUND THE EXIT." : "IT FOUND YOU.", title);
             GUI.Label(new Rect(112, 398, 850, 100), escaped
                 ? "One last step. Then the world opens up."

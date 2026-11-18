@@ -16,11 +16,12 @@ namespace Haunter
         [DllImport("__Internal")] static extern float Haunter_TouchAxis(int axis);
         [DllImport("__Internal")] static extern int Haunter_TouchButtons();
         [DllImport("__Internal")] static extern void Haunter_ResetTouchInput();
-        [DllImport("__Internal")] static extern void Haunter_UpdateTouchState(int state, int actions, int held, int nearby, float charge);
+        [DllImport("__Internal")] static extern void Haunter_UpdateTouchState(int state, int actions, int held, int nearby, float charge, int menuFlags);
         [DllImport("__Internal")] static extern void Haunter_UpdateTouchTutorial(string heading, string instruction, int frozen);
         static TutorialDirector lastTutorial;
         static TutorialStage lastStage;
         static bool lastCrouched, tutorialVisible;
+        static string lastHint, lastHintHeading;
 #endif
 
         public static bool Enabled
@@ -69,17 +70,23 @@ namespace Haunter
 #if UNITY_WEBGL && !UNITY_EDITOR
             var player = session.Player;
             int nearby = player != null && player.NearbyObject != null ? 1 : 0;
-            if (nearby == 0 && player != null && session.Exit != null
-                && PlayerController.HorizontalDistance(player.transform.position, session.Exit.position) < 1.9f)
+            if (nearby == 0 && session.PlayerNearExit(1.9f))
                 nearby = 2;
+            int menuFlags = (session.Tutorial != null && session.Tutorial.Active ? 1 : 0)
+                | (session.ReducedDistortion ? 2 : 0);
             Haunter_UpdateTouchState((int)session.State, player != null ? (int)player.AllowedActions : 0,
                 player != null && player.HeldObject != null ? 1 : 0, nearby,
-                player != null ? player.ThrowCharge : 0f);
+                player != null ? player.ThrowCharge : 0f, menuFlags);
             var tutorial = session.Tutorial;
             if (!Enabled || tutorial == null || !tutorial.Active)
             {
-                if (tutorialVisible) Haunter_UpdateTouchTutorial(string.Empty, string.Empty, 0);
+                string hint = Enabled ? session.Campaign.Hint ?? string.Empty : string.Empty;
+                string heading = Enabled ? session.Campaign.HintHeading ?? string.Empty : string.Empty;
+                if (tutorialVisible || hint != lastHint || heading != lastHintHeading)
+                    Haunter_UpdateTouchTutorial(heading, hint, 0);
                 tutorialVisible = false;
+                lastHint = hint;
+                lastHintHeading = heading;
                 return;
             }
             if (!tutorialVisible || tutorial != lastTutorial || tutorial.Stage != lastStage || tutorial.HasCrouched != lastCrouched)

@@ -13,7 +13,7 @@ Shader "Hidden/Haunter/OutlineComposite"
             #include "UnityCG.cginc"
             sampler2D _MainTex, _CameraDepthNormalsTexture;
             float4 _MainTex_TexelSize;
-            float _LineWidth, _Brightness;
+            float _LineWidth, _Brightness, _HaunterInterference, _EchoTime;
 
             float normalEdge(float4 a, float4 b)
             {
@@ -52,6 +52,21 @@ Shader "Hidden/Haunter/OutlineComposite"
                 reveal = max(reveal, tex2D(_MainTex, uv + float2(0, pixel.y)).r);
                 reveal = max(reveal, tex2D(_MainTex, uv - float2(0, pixel.y)).r);
                 float white = saturate((contour * reveal + mask.g) * _Brightness);
+                if (_HaunterInterference > .01)
+                {
+                    // Preserve nearby contours and held props. Only the composite reveal
+                    // samples drift, so geometry, navigation and interaction never shift.
+                    float farEcho = smoothstep(3.1, 13.0, depth * _ProjectionParams.z);
+                    float amount = _HaunterInterference * farEcho * (1.0 - saturate(mask.g));
+                    float phase = 9.0 * uv.y + 7.0 * uv.x - _EchoTime * 1.7;
+                    float2 drift = float2(sin(phase), cos(phase * .72)) * (.012 * amount);
+                    float4 distant = tex2D(_CameraDepthNormalsTexture, saturate(depthUV + drift));
+                    float4 next = tex2D(_CameraDepthNormalsTexture, saturate(depthUV + drift + float2(pixel.x, pixel.y)));
+                    float delayedReveal = tex2D(_MainTex, saturate(uv + drift)).r;
+                    float interference = .58 + .28 * sin(phase + delayedReveal * 4.4);
+                    float ghost = normalEdge(distant, next) * delayedReveal * interference;
+                    white = saturate(white * (1.0 - .35 * amount) + ghost * amount * .92);
+                }
                 // A subtle soft shoulder keeps narrow white lines comfortable on black.
                 white = pow(white, .82);
                 return float4(white, white, white, 1);

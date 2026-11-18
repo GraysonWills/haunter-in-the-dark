@@ -15,6 +15,7 @@ namespace Haunter
         private NavMeshData navigationData;
         private NavMeshDataInstance navigationInstance;
         public bool NavMeshReady { get; private set; }
+        public Material EchoSurfaceMaterial => floorRenderer ? floorRenderer.sharedMaterial : null;
 
         private void Awake()
         {
@@ -28,7 +29,7 @@ namespace Haunter
             if (exitThreshold == null || playerReference == null || GameSession.Instance == null) return;
             if (GameSession.Instance.State == SessionState.Playing &&
                 exitThreshold.bounds.Contains(playerReference.position + Vector3.up * .8f))
-                GameSession.Instance.Escape();
+                GameSession.Instance.ReachExit();
         }
 
         private static void ApplyFloorMask(Renderer floor)
@@ -70,6 +71,24 @@ namespace Haunter
         {
             if (navigationInstance.valid) navigationInstance.Remove();
             if (navigationData != null) Destroy(navigationData);
+        }
+
+        public void CloseArchive()
+        {
+            if (navigationInstance.valid) navigationInstance.Remove();
+            NavMeshReady = false;
+            exitThreshold = null;
+            if (staticGeometry)
+            {
+                staticGeometry.gameObject.SetActive(false);
+                Destroy(staticGeometry.gameObject);
+            }
+            var props = transform.Find("Loose objects — pick up and throw");
+            if (props)
+            {
+                props.gameObject.SetActive(false);
+                Destroy(props.gameObject);
+            }
         }
 
         public static void Build(Material material)
@@ -298,7 +317,7 @@ namespace Haunter
                 Box("Crate band", crate.transform, new Vector3(x, 0, -.507f), new Vector3(.075f, 1.02f, .025f), material, false);
         }
 
-        private static void CreateThrowable(Transform parent, Vector3 position, int type, Material material)
+        internal static void CreateThrowable(Transform parent, Vector3 position, int type, Material material)
         {
             string displayName = type == 0 ? "Tin can" : type == 1 ? "Glass bottle" : "Loose stone";
             // Place resting props at contact height so starting the game does not trigger

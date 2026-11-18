@@ -4,6 +4,12 @@ A playable first-person Unity horror concept. Sound is your only sight: footstep
 
 **[Play in your browser](https://graysonwills.github.io/haunter-in-the-dark/)** · [Download for Windows](https://github.com/GraysonWills/haunter-in-the-dark/releases/latest/download/HaunterInTheDark-Windows.zip) · [Release notes and source downloads](https://github.com/GraysonWills/haunter-in-the-dark/releases/latest)
 
+## Four-level development build
+
+The development build adds the courtyard, ballroom, and final maze after the original archive tutorial. Find a route upstairs after a collapse, let overlapping echoes settle in the ballroom's quiet alcoves, and give each maze creature its own distraction. The public browser link above opens the released build.
+
+On the pause menu, **Reduce distortion** softens the ballroom's overlapping outlines. It leaves collisions, reach and routes fixed. The [expansion design](docs/EXPANSION-DESIGN.md) includes the maps, encounter walkthroughs, and research.
+
 ![A cane ripple reveals white outlines across the dark room](docs/evidence/03-cane-ripple.png)
 
 ## Play in your browser
