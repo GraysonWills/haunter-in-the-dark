@@ -19,7 +19,7 @@
     canvas { display: block; width: 100%; height: 100%; background: #000; outline: none; }
     canvas:focus-visible { outline: 1px solid #bcbcbc; outline-offset: -2px; }
     canvas:fullscreen { width: 100vw; height: 100vh; border: 0; }
-    .cover { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; padding: 28px; text-align: center; overflow: hidden; background: #060606; }
+    .cover { position: absolute; inset: 0; z-index: 6; display: grid; place-content: center; justify-items: center; padding: 28px; text-align: center; overflow: hidden; background: #060606; }
     .cover[hidden], [hidden] { display: none !important; }
     .echo-mark { width: 106px; height: 106px; position: relative; margin-bottom: 30px; border: 1px solid #303030; border-radius: 50%; }
     .echo-mark::before, .echo-mark::after { content: ""; position: absolute; border: 1px solid #666; border-radius: 50%; inset: 17px; }
@@ -65,7 +65,7 @@
       footer { flex-direction: column; gap: 12px; }
     }
   </style>
-  <link rel="stylesheet" href="touch-controls.css">
+  <link rel="stylesheet" href="touch-controls.css?v={{{ PRODUCT_VERSION }}}">
 </head>
 <body>
   <main>
@@ -78,15 +78,19 @@
         <div class="touch-movement"><button id="touch-crouch" type="button" aria-pressed="false">Crouch</button><button id="touch-sprint" type="button">Hold to run</button></div>
         <div class="touch-actions"><button id="touch-cane" type="button">Tap cane</button><button id="touch-pickup" type="button">Pick up</button><button id="touch-drop" type="button">Drop</button><button id="touch-throw" type="button">Hold to throw</button></div>
       </div>
+      <aside id="touch-tutorial" role="status" aria-atomic="true" hidden>
+        <strong id="touch-tutorial-heading" data-tutorial-heading></strong>
+        <p id="touch-tutorial-copy" data-tutorial-copy></p>
+      </aside>
       <div id="touch-menu" hidden aria-label="Game menu"><button id="touch-begin" type="button">Begin</button><button id="touch-resume" type="button" hidden>Resume</button><button id="touch-restart" type="button" hidden>Start again</button><button id="touch-skip" type="button">Skip tutorial</button></div>
-      <button id="exit-expanded" type="button" hidden>Exit fullscreen</button>
+      <button id="exit-expanded" type="button" hidden>Exit expanded view</button>
       <div class="cover" id="cover">
         <div class="echo-mark" aria-hidden="true"></div>
         <h2>Sound is your only sight.</h2>
         <p>Feel the room through echoes. Draw the creature away.<br>Find your way out of the dark.</p>
         <button id="play-button" type="button">Play in browser</button>
         <div id="loading" hidden><progress id="progress" max="1" value="0" aria-label="Loading game"></progress><span id="loading-text" role="status">Preparing the game…</span></div>
-        <p id="mobile-note" hidden>Touch controls enabled. Turn your iPad sideways for more room.</p>
+        <p id="mobile-note" hidden>Touch controls enabled. Turn your phone or tablet sideways for more room.</p>
         <div id="error" role="alert" hidden></div>
       </div>
     </div>
@@ -97,7 +101,7 @@
     </section>
     <footer><span>A single-room prototype. WebGL 2 required. Touch or keyboard and mouse.</span><div class="links"><a href="https://github.com/GraysonWills/haunter-in-the-dark" target="_blank" rel="noopener">Source &amp; build guide ↗</a><a href="https://github.com/GraysonWills/haunter-in-the-dark/releases/latest" target="_blank" rel="noopener">Windows download ↗</a></div></footer>
   </main>
-  <script src="touch-controls.js"></script>
+  <script src="touch-controls.js?v={{{ PRODUCT_VERSION }}}"></script>
   <script>
     const canvas = document.getElementById("unity-canvas");
     const cover = document.getElementById("cover");
@@ -125,8 +129,13 @@
       errorBox.hidden = false;
       errorBox.textContent = message + " Reload this page to try again, or use the Windows download below.";
       status.textContent = "The game could not start in this browser.";
+      fullscreenButton.disabled = true;
       console.error(message);
     }
+
+    canvas.addEventListener("webglcontextlost", () => {
+      if (started) showError("This browser stopped rendering the game. On a phone, try closing other tabs before reloading.");
+    });
 
     playButton.addEventListener("click", () => {
       if (started) return;
@@ -135,10 +144,14 @@
       playButton.hidden = true;
       loading.hidden = false;
       status.textContent = "Loading the game. The first visit may take a moment.";
-      const probe = document.createElement("canvas").getContext("webgl2");
-      if (!probe) { showError("WebGL 2 is unavailable. Try an updated browser or a desktop with hardware acceleration enabled."); return; }
+      if (typeof WebAssembly !== "object") { showError("WebAssembly is unavailable. Try an updated browser."); return; }
+      let probe;
+      try { probe = document.createElement("canvas").getContext("webgl2"); }
+      catch (_) { /* Some browsers reject context creation instead of returning null. */ }
+      if (!probe) { showError("WebGL 2 is unavailable. Try an updated browser with hardware acceleration enabled."); return; }
       const loseContext = probe.getExtension("WEBGL_lose_context");
       if (loseContext) loseContext.loseContext();
+      window.haunterTouch.prepareForPlay();
       const buildUrl = "Build";
       const config = {
         dataUrl: buildUrl + "/{{{ DATA_FILENAME }}}",
@@ -154,7 +167,7 @@
         companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
         productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
         productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
-        devicePixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
+        devicePixelRatio: Math.min(window.devicePixelRatio || 1, window.haunterTouch.enabled ? 1 : 1.5),
         showBanner: (message, type) => { if (type === "error") showError(message); else console.warn(message); }
       };
       const script = document.createElement("script");
@@ -165,6 +178,10 @@
           progress.value = value;
           loadingText.textContent = value < .9 ? "Loading echoes… " + Math.round(value * 100) + "%" : "Entering the dark…";
         }).then(instance => {
+          if (window.haunterLoadingState === "error") {
+            instance.Quit().catch(() => {});
+            return;
+          }
           window.unityInstance = instance;
           window.haunterLoadingState = "ready";
           cover.hidden = true;

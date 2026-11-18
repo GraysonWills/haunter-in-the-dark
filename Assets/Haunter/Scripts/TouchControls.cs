@@ -17,6 +17,10 @@ namespace Haunter
         [DllImport("__Internal")] static extern int Haunter_TouchButtons();
         [DllImport("__Internal")] static extern void Haunter_ResetTouchInput();
         [DllImport("__Internal")] static extern void Haunter_UpdateTouchState(int state, int actions, int held, int nearby, float charge);
+        [DllImport("__Internal")] static extern void Haunter_UpdateTouchTutorial(string heading, string instruction, int frozen);
+        static TutorialDirector lastTutorial;
+        static TutorialStage lastStage;
+        static bool lastCrouched, tutorialVisible;
 #endif
 
         public static bool Enabled
@@ -71,6 +75,21 @@ namespace Haunter
             Haunter_UpdateTouchState((int)session.State, player != null ? (int)player.AllowedActions : 0,
                 player != null && player.HeldObject != null ? 1 : 0, nearby,
                 player != null ? player.ThrowCharge : 0f);
+            var tutorial = session.Tutorial;
+            if (!Enabled || tutorial == null || !tutorial.Active)
+            {
+                if (tutorialVisible) Haunter_UpdateTouchTutorial(string.Empty, string.Empty, 0);
+                tutorialVisible = false;
+                return;
+            }
+            if (!tutorialVisible || tutorial != lastTutorial || tutorial.Stage != lastStage || tutorial.HasCrouched != lastCrouched)
+            {
+                Haunter_UpdateTouchTutorial(tutorial.Heading, tutorial.Instruction, tutorial.WorldFrozen ? 1 : 0);
+                tutorialVisible = true;
+                lastTutorial = tutorial;
+                lastStage = tutorial.Stage;
+                lastCrouched = tutorial.HasCrouched;
+            }
 #endif
         }
     }

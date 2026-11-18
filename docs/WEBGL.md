@@ -24,11 +24,11 @@ This repository's live GitHub Pages site publishes from the root of the `codex/p
 
 ## Browser controls
 
-Select **Play in browser** to load the game, then use the game's start button or Enter. On desktop, a click on the canvas captures the mouse. Escape pauses and releases it; click Resume to continue. Audio starts after interaction with the page. Fullscreen is available from the page button.
+Select **Play in browser** to load the game, then use the game's start button or Enter. On desktop, a click on the canvas captures the mouse if the browser supports it. If mouse capture is unavailable, drag to look and use the keyboard to move. Escape opens the pause menu. Audio starts after interaction with the page. Fullscreen is available from the page button.
 
 Use WASD to move. Hold **either Shift key or C** to crouch, and hold **R** to sprint. **Shift + W** moves forward quietly; **R + W** runs forward. These browser bindings avoid the Ctrl + W tab-closing shortcut. Crouching takes priority if both crouch and sprint are held. R still restarts the game after an ending. The Windows player retains Ctrl/C for crouching and Shift for sprinting.
 
-### Touch controls and iPad
+### Touch controls on phones and tablets
 
 Touch mode activates automatically on compatible touch devices. Use the **Touch controls** toggle before beginning or while paused to change input modes. Append `?touch=1` to force touch mode, or `?touch=0` to choose keyboard/mouse controls.
 
@@ -40,7 +40,11 @@ Touch mode activates automatically on compatible touch devices. Use the **Touch 
 
 Multiple touches can move, look and use actions together. The tutorial prompts adapt to touch input and limit controls to the current lesson, including pickup and throwing while game time is frozen. Touch mode does not request mouse capture or pause because mouse capture is unavailable. Leaving the browser window or hiding the page still pauses the game and clears held controls. Pointer cancellation clears movement and cancels a charged throw rather than throwing accidentally.
 
-The game requires **WebGL 2**. On an iPad, use a current **iPadOS/Safari** version; landscape orientation is recommended. The fullscreen control keeps the touch overlay with the game and falls back to an expanded page view when browser fullscreen is unavailable. Actual iPad hardware validation is still pending; no device-performance claim is made.
+The game requires **WebGL 2 and WebAssembly**. Use a current browser. On iPhone and iPad, landscape gives the touch controls more room. The fullscreen control keeps the touch overlay with the game and uses an expanded page view when browser fullscreen is unavailable. The renderer uses a lower pixel ratio in touch mode to reduce the load on mobile graphics hardware.
+
+Phone-sized layouts are tested with iPhone profiles in WebKit. Testing on physical iPhone and iPad hardware is still pending.
+
+Audio uses browser playback of the packaged Unity sound effects. If the browser cannot initialize Web Audio, use the visible echoes to play. The tutorial and creature still respond to sound events.
 
 ## Diagnostics
 

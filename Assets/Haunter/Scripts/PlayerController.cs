@@ -136,11 +136,6 @@ namespace Haunter
 
         void Move()
         {
-            if (TouchControls.Enabled)
-            {
-                ApplyMovement(TouchControls.Move, TouchControls.Pressed(TouchControls.Crouch), TouchControls.Pressed(TouchControls.Sprint));
-                return;
-            }
 #if UNITY_WEBGL && !UNITY_EDITOR
             // Ctrl + movement keys can trigger browser shortcuts such as closing the tab.
             bool crouchRequested = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) || Input.GetKey(KeyCode.C);
@@ -149,7 +144,15 @@ namespace Haunter
             bool crouchRequested = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C);
             bool sprintRequested = Input.GetKey(KeyCode.LeftShift);
 #endif
-            ApplyMovement(new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")), crouchRequested, sprintRequested);
+            Vector2 movement = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
+            if (TouchControls.Enabled)
+            {
+                Vector2 stick = TouchControls.Move;
+                if (stick.sqrMagnitude > 0f) movement = stick;
+                crouchRequested |= TouchControls.Pressed(TouchControls.Crouch);
+                sprintRequested |= TouchControls.Pressed(TouchControls.Sprint);
+            }
+            ApplyMovement(movement, crouchRequested, sprintRequested);
         }
 
         public void ApplyMovement(Vector2 moveInput, bool crouchRequested, bool sprintRequested)

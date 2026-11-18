@@ -287,13 +287,16 @@ namespace Haunter
 
         void DrawTutorial()
         {
-            float top = TouchControls.Enabled ? 145f : 650f;
-            Fill(new Rect(330, top, 940, 137), .94f, false);
-            Fill(new Rect(330, top, 940, 1), .38f);
-            Text(new Rect(350, top + 13, 900, 22), Tutorial.WorldFrozen ? "GUIDED OPENING  /  TIME FROZEN" : "GUIDED OPENING", centered, .48f);
-            GUI.Label(new Rect(350, top + 42, 900, 28), Tutorial.Heading, tutorialHeading);
-            Text(new Rect(360, top + 80, 880, 45), Tutorial.Instruction, tutorialCopy, .92f);
-            if (!TouchControls.Enabled) Text(new Rect(1330, 35, 240, 28), "T  SKIP TUTORIAL", small, .65f);
+            if (!TouchControls.Enabled)
+            {
+                const float top = 650f;
+                Fill(new Rect(330, top, 940, 137), .94f, false);
+                Fill(new Rect(330, top, 940, 1), .38f);
+                Text(new Rect(350, top + 13, 900, 22), Tutorial.WorldFrozen ? "GUIDED OPENING  /  TIME FROZEN" : "GUIDED OPENING", centered, .48f);
+                GUI.Label(new Rect(350, top + 42, 900, 28), Tutorial.Heading, tutorialHeading);
+                Text(new Rect(360, top + 80, 880, 45), Tutorial.Instruction, tutorialCopy, .92f);
+                Text(new Rect(1330, 35, 240, 28), "T  SKIP TUTORIAL", small, .65f);
+            }
             if (Tutorial.Stage == TutorialStage.Throw || Tutorial.Stage == TutorialStage.FocusThrow)
             {
                 Vector3 target = Player.ViewCamera.WorldToViewportPoint(Tutorial.ThrowTarget);

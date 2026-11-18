@@ -10,7 +10,7 @@ A playable first-person Unity horror concept. Sound is your only sight: footstep
 
 Open **[Haunter in the Dark](https://graysonwills.github.io/haunter-in-the-dark/)** and select **Play in browser**. The game loads directly on the page; no installation or Unity editor is needed. Desktop players use a keyboard and mouse: click the game to capture the mouse, and press Escape to pause and release it. Touch controls appear automatically on compatible touch devices, with large buttons for starting, resuming and restarting.
 
-The browser version uses the same Unity scene, echo shaders and creature behavior as the Windows game. It requires WebGL 2; on an iPad, use a current iPadOS and Safari version. Landscape orientation is recommended. Touch mode does not require mouse capture, so it avoids the repeated pause/resume loop caused by that desktop requirement. The first load downloads the game into your browser, so allow the loading bar to finish. Actual iPad hardware validation is still pending.
+The browser version uses the same Unity scene, echo shaders and creature behavior as the Windows game. It requires WebGL 2 and WebAssembly. On a phone or tablet, use an up-to-date browser and turn the device sideways for more room. The touch layout keeps the controls and tutorial prompts readable on narrow screens. The first load downloads the game into your browser, so allow the loading bar to finish.
 
 Use the **Touch controls** toggle before starting or while paused to choose the input mode. You can also open **[the touch-mode link](https://graysonwills.github.io/haunter-in-the-dark/?touch=1)** to force touch controls. The fullscreen button expands the game with its controls; when browser fullscreen is unavailable, touch mode uses an expanded page view.
 
@@ -88,7 +88,7 @@ The saved scene is editable: move furniture, place props, adjust the creature an
 3. `OutlineComposite.shader` detects depth and normal discontinuities, then gates those white edges with the reveal mask. Faces stay black. Several waves can overlap; there is a short fading trail behind each wave.
 4. Held objects and the cane use `_AlwaysVisible` so their outlines remain readable between echoes. Other surfaces return to black.
 
-The synthetic audio, procedural room and creature are original placeholders. This is a fictional horror mechanic, not a simulation of blindness. The reference informs the visual language; no Avatar assets are used.
+The synthetic audio, procedural room and creature are original placeholders. The Unity build tools generate the sound effects as WAV assets. If Web Audio is unavailable, the echo visuals and tutorial still work. This is a fictional horror mechanic, not a simulation of blindness. The reference informs the visual language; no Avatar assets are used.
 
 ### Tuning
 

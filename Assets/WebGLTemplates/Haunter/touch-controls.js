@@ -10,6 +10,9 @@
   const fullscreen = document.getElementById("fullscreen-button");
   const exitExpanded = document.getElementById("exit-expanded");
   const menu = document.getElementById("touch-menu");
+  const tutorial = document.getElementById("touch-tutorial");
+  const tutorialHeading = document.getElementById("touch-tutorial-heading");
+  const tutorialCopy = document.getElementById("touch-tutorial-copy");
   const menuButtons = {
     begin: document.getElementById("touch-begin"), skip: document.getElementById("touch-skip"),
     resume: document.getElementById("touch-resume"), restart: document.getElementById("touch-restart")
@@ -24,15 +27,17 @@
     pause: { element: document.getElementById("touch-pause"), action: 0, pulse: 128 }
   };
   const query = new URLSearchParams(window.location.search);
+  const pointerLockAvailable = typeof canvas.requestPointerLock === "function";
   let enabled = query.get("touch") === "1" || (query.get("touch") !== "0"
-    && navigator.maxTouchPoints > 0
-    && (window.matchMedia("(any-pointer: coarse)").matches || !canvas.requestPointerLock));
+    && (!pointerLockAvailable || (navigator.maxTouchPoints > 0
+      && window.matchMedia("(any-pointer: coarse)").matches)));
   let session = 0, actions = 0, held = false, nearby = 0;
   let moveX = 0, moveY = 0, lookX = 0, lookY = 0, pulses = 0;
   let throwing = false, sprinting = false, crouching = false;
   let stickPointer = null, lookPointer = null;
   let lastLookX = 0, lastLookY = 0, lastCharge = -1;
   let expanded = false, savedScrollY = 0;
+  let nativeFullscreen = false;
   let uiSession = -1, uiActions = -1, uiHeld = null, uiNearby = -1, uiEnabled = null;
   const pointers = new Map();
 
@@ -44,7 +49,9 @@
       && ((name !== "throw" && name !== "drop") || held);
   }
   function paintStick() {
-    thumb.style.transform = `translate(${moveX * 36}px, ${-moveY * 36}px)`;
+    const width = stick.getBoundingClientRect().width;
+    const travel = Math.min(36, width * .29);
+    thumb.style.transform = `translate(${moveX * travel}px, ${-moveY * travel}px)`;
   }
   function paintCrouch() {
     controls.crouch.element.setAttribute("aria-pressed", String(crouching));
@@ -167,6 +174,7 @@
     document.getElementById("mobile-note").hidden = !enabled;
     document.getElementById("touch-instructions").hidden = !enabled;
     document.getElementById("keyboard-instructions").hidden = enabled;
+    if (!expanded) fullscreen.textContent = enabled ? "Expand view ↗" : "Fullscreen ↗";
     canvas.setAttribute("aria-label", enabled
       ? "Haunter in the Dark game. Tap Begin to start. Move with the left stick and drag the scene to look."
       : "Haunter in the Dark game. Press Enter to begin. Use WASD and mouse to move.");
@@ -197,6 +205,7 @@
       uiSession = session; uiActions = actions; uiHeld = held; uiNearby = nearby; uiEnabled = enabled;
       layer.hidden = !enabled || session !== 1;
       menu.hidden = !enabled || session === 1 || window.haunterLoadingState !== "ready";
+      tutorial.hidden = !enabled || session !== 1 || !tutorialHeading.textContent;
       menuButtons.begin.hidden = session !== 0;
       menuButtons.skip.hidden = session !== 0 && session !== 2;
       menuButtons.skip.textContent = session === 0 ? "Skip tutorial" : "Skip tutorial & resume";
@@ -222,22 +231,55 @@
       lastCharge = percent;
     }
   }
+  function updateTutorial(heading, copy, frozen) {
+    tutorialHeading.textContent = heading;
+    tutorialCopy.textContent = copy;
+    tutorial.setAttribute("data-frozen", String(frozen));
+    tutorial.hidden = !enabled || session !== 1 || !heading;
+  }
+  function pointerLockFailed() {
+    if (enabled || window.haunterLoadingState !== "ready") return;
+    document.getElementById("status").textContent =
+      "Mouse capture is unavailable. Turn on Touch controls to use drag-to-look and WASD.";
+  }
+  document.addEventListener("pointerlockerror", pointerLockFailed);
+
+  function prepareForPlay() {
+    // Fill small screens without requiring native fullscreen, which iPhone may not expose.
+    if (enabled && window.matchMedia("(max-width: 520px), (orientation: landscape) and (max-height: 460px)").matches)
+      setExpanded(true);
+  }
   function setExpanded(value) {
     if (expanded === value) return;
     interrupt();
     if (value) savedScrollY = window.scrollY;
     expanded = value;
+    updateViewportHeight();
     frame.classList.toggle("game-expanded", value);
     document.body.classList.toggle("game-expanded-page", value);
     exitExpanded.hidden = !value;
-    fullscreen.textContent = value ? "Exit fullscreen" : "Fullscreen ↗";
+    const exitLabel = nativeFullscreen ? "Exit fullscreen" : "Exit expanded view";
+    exitExpanded.textContent = exitLabel;
+    fullscreen.textContent = value ? exitLabel : (enabled ? "Expand view ↗" : "Fullscreen ↗");
     if (!value) window.scrollTo(0, savedScrollY);
   }
+  function updateViewportHeight() {
+    if (expanded && !nativeFullscreen && window.visualViewport)
+      frame.style.setProperty("--haunter-viewport-height", `${window.visualViewport.height}px`);
+    else if (window.visualViewport)
+      frame.style.removeProperty("--haunter-viewport-height");
+  }
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", updateViewportHeight);
   async function enterFullscreen() {
     if (expanded || document.fullscreenElement === frame) { await leaveFullscreen(); return; }
     // Fullscreen the frame so the HTML controls remain above the Unity canvas.
     if (frame.requestFullscreen) {
-      try { await frame.requestFullscreen(); setExpanded(true); return; } catch (_) { /* iPad may deny fullscreen. */ }
+      try {
+        await frame.requestFullscreen();
+        nativeFullscreen = document.fullscreenElement === frame;
+        setExpanded(true);
+        return;
+      } catch (_) { /* Fall back to the viewport on browsers that deny fullscreen. */ }
     }
     setExpanded(true);
   }
@@ -245,11 +287,15 @@
     if (document.fullscreenElement && document.exitFullscreen) {
       try { await document.exitFullscreen(); } catch (_) { /* Restore the page even if fullscreen already ended. */ }
     }
+    nativeFullscreen = false;
     setExpanded(false);
   }
   exitExpanded.addEventListener("click", leaveFullscreen);
   document.addEventListener("fullscreenchange", () => {
-    if (!document.fullscreenElement && expanded && frame.requestFullscreen) setExpanded(false);
+    if (!document.fullscreenElement && expanded && nativeFullscreen) {
+      nativeFullscreen = false;
+      setExpanded(false);
+    }
   });
   window.addEventListener("keydown", event => {
     if (event.key === "Escape" && expanded && !document.fullscreenElement) leaveFullscreen();
@@ -268,7 +314,7 @@
       pulses = 0;
       return value;
     },
-    reset, update, ready, enterFullscreen
+    reset, update, updateTutorial, ready, enterFullscreen, prepareForPlay, pointerLockFailed
   };
   refreshMode();
 })();

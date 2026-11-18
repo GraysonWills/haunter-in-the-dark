@@ -1,4 +1,7 @@
 mergeInto(LibraryManager.library, {
+  Haunter_HasWebAudio: function () {
+    return (typeof window.AudioContext === "function" || typeof window.webkitAudioContext === "function") ? 1 : 0;
+  },
   Haunter_TouchEnabled: function () {
     return window.haunterTouch && window.haunterTouch.enabled ? 1 : 0;
   },
@@ -13,6 +16,9 @@ mergeInto(LibraryManager.library, {
   },
   Haunter_UpdateTouchState: function (state, actions, held, nearby, charge) {
     if (window.haunterTouch) window.haunterTouch.update(state, actions, held, nearby, charge);
+  },
+  Haunter_UpdateTouchTutorial: function (heading, instruction, frozen) {
+    if (window.haunterTouch) window.haunterTouch.updateTutorial(UTF8ToString(heading), UTF8ToString(instruction), frozen !== 0);
   },
   Haunter_SmokeRequested: function () {
     return new URLSearchParams(window.location.search).get("smoke") === "1" ? 1 : 0;
@@ -34,9 +40,12 @@ mergeInto(LibraryManager.library, {
     // Do not queue a retry or wait for an unrelated future key/click.
     try {
       var pending = canvas.requestPointerLock();
-      if (pending && typeof pending.catch === "function") pending.catch(function () {});
+      if (pending && typeof pending.catch === "function") pending.catch(function () {
+        if (window.haunterTouch) window.haunterTouch.pointerLockFailed();
+      });
     } catch (error) {
       // Older browsers can throw synchronously instead of rejecting a Promise.
+      if (window.haunterTouch) window.haunterTouch.pointerLockFailed();
     }
   },
   Haunter_PublishState: function (json) {

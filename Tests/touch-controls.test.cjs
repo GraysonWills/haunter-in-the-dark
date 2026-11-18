@@ -51,6 +51,34 @@ test('touch defaults detect an iPad even with mouse-oriented media queries', () 
   assert.equal(boot({ query: '?touch=0', touchPoints: 5, coarse: true }).api.enabled, false);
 });
 
+test('desktop browsers without pointer lock start with the playable drag controls', () => {
+  const { api, get } = boot({ query: '', pointerLock: false });
+  assert.equal(api.enabled, true);
+  assert.equal(get('touch-toggle').checked, true);
+  assert.equal(get('touch-menu').hidden, false);
+});
+
+test('a denied capture explains how to switch to drag and keyboard controls', () => {
+  const { document, get } = boot({ query: '' });
+  document.emit('pointerlockerror');
+  assert.match(get('status').textContent, /Turn on Touch controls.*WASD/);
+});
+
+test('touch tutorial shows the current frozen step and hides while paused or skipped', () => {
+  const { api, get } = boot();
+  api.update(1, 32, 0, 1, 0);
+  api.updateTutorial('PICK UP', 'Tap Pick up to continue.', true);
+  assert.equal(get('touch-tutorial').hidden, false);
+  assert.equal(get('touch-tutorial').attributes['data-frozen'], 'true');
+  assert.equal(get('touch-tutorial-copy').textContent, 'Tap Pick up to continue.');
+  api.update(2, 32, 0, 1, 0);
+  assert.equal(get('touch-tutorial').hidden, true);
+  api.update(1, 32, 0, 1, 0);
+  assert.equal(get('touch-tutorial').hidden, false);
+  api.updateTutorial('', '', false);
+  assert.equal(get('touch-tutorial').hidden, true);
+});
+
 test('movement and look accept independent simultaneous pointers', () => {
   const { api, get } = boot(); api.update(1, 511, 0, 0, 0);
   get('touch-stick').emit('pointerdown', { pointerId: 11, clientX: 64, clientY: 0 });
@@ -177,6 +205,9 @@ test('unsupported fullscreen uses an escapable full-frame layout, preserving the
   assert.equal(get('player-frame').classList.contains('game-expanded'), true);
   assert.equal(document.body.classList.contains('game-expanded-page'), true);
   assert.equal(get('exit-expanded').hidden, false);
+  assert.equal(get('exit-expanded').textContent, 'Exit expanded view');
+  document.emit('fullscreenchange');
+  assert.equal(get('player-frame').classList.contains('game-expanded'), true);
   get('exit-expanded').emit('click');
   assert.equal(get('player-frame').classList.contains('game-expanded'), false);
   assert.equal(JSON.stringify(window.lastScroll), '[0,72]');
