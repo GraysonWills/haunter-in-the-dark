@@ -1,23 +1,25 @@
 {
-  "generatedAtUtc": "2026-11-17T22:28:12.0958197Z",
+  "generatedAtUtc": "2026-11-18T17:28:36.253612+00:00",
   "platform": "WebGL 2",
-  "version": "0.5.0",
-  "sourceCommit": "a0a24f5e1f7393abb9b546945077684c95341705",
+  "version": "0.5.1",
+  "sourceCommit": "e89ebf8f0fe7c298072a29aa4d77b26eca2972ff",
   "unityVersion": "2023.1.14f1",
   "features": [
     "guided-tutorial",
-    "touch-controls",
-    "ipad-pointer-lock-pause-fix",
-    "safe-forced-tutorial-observation"
+    "phone-touch-layout",
+    "mobile-viewport-resizing",
+    "desktop-drag-look-fallback",
+    "packaged-audio",
+    "visual-echo-without-web-audio"
   ],
   "assetSha256": {
     ".nojekyll": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "Build/26eea9c2afa3cb33026ba11b60c14275.js.unityweb": "ecaa9f2737b9530e7f930152485d2d30955f83c0cab49afec9b532297776b1f1",
-    "Build/b2db1f98b323d9e25bedf49f1f70bfc0.wasm.unityweb": "b8b855b29a3001680963fc949d765b1223e491d4fc630aa7b543397ceb523e74",
-    "Build/ddf6516bda169cc4403786a3f856f5fd.data.unityweb": "755631a446d04939da0680cb18871875d39015bca75f445b9f6dc288ec84cbaa",
+    "Build/0bb96a39f858e0328ede8665cf05703e.wasm.unityweb": "8abfbe9be89c761ee8b5097a3de14c42d000a2f5ed0f9172efbfc2241c0bb9bf",
+    "Build/3476889b30c211d1f3ebdeb2bede4bf3.js.unityweb": "540bfe97838195e3ff0639c5b877364608dea67239309c5d8ff6275b4e0157b3",
     "Build/WebGL.loader.js": "3a1e1233c2d6c8a0eb4c8d7604a4cc056063b7bf34351d160b25f84a15027150",
-    "index.html": "c96d15cdfbcc9529a4d5b7e1d17f9bc1c67fed4513e11a02601258e23fc5acc3",
-    "touch-controls.css": "cff732340b3eba4db03e4af240f215cb9a26edf24ba30c479313400c6f18b4da",
-    "touch-controls.js": "18c4d2e56719d334e7a7339490011edea381eb952804f7d0729caf0c01063f1d"
+    "Build/cc8b070f909488bdc2d346bcada81043.data.unityweb": "d4e838763d9f6be96731b27658f6ef593215ae0dbee84050c0677b3fc0761d4c",
+    "index.html": "7180285a8aee67cc07ffc2b1f6eef0228e6712cc7e32d4c19b9d1419060867f8",
+    "touch-controls.css": "e725ceb99d0296cccd28888db38bc5d6bd28d3662d97b0028bcdab24860aa8e4",
+    "touch-controls.js": "82b662e0545e77c7883c1123b6f43424a2e0178ee32a6aba6222f425d5e43973"
   }
 }
