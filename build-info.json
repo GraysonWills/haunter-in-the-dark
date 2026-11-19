@@ -1,9 +1,9 @@
 {
-  "version": "0.6.0",
+  "version": "0.7.0",
   "platform": "WebGL 2",
-  "sourceCommit": "dba5f91915e5ca398c24a7ae75f83346a95155cb",
+  "sourceCommit": "65f0517ed9769eecbc746115a0d109cfa5a866b4",
   "unityVersion": "2023.1.14f1",
-  "generatedAtUtc": "2026-11-19T12:59:46.664267+00:00",
+  "generatedAtUtc": "2026-11-19T14:10:27.914075+00:00",
   "features": [
     "four-connected-levels",
     "guided-tutorial",
@@ -12,16 +12,23 @@
     "centered-throw-charge",
     "held-object-wind-up",
     "collision-independent-aim-arc",
-    "concurrent-cane-and-throw"
+    "concurrent-cane-and-throw",
+    "level-select",
+    "saved-checkpoints",
+    "retry-current-level",
+    "level-transitions",
+    "courtyard-collapse",
+    "ballroom-distortion-lesson",
+    "replayable-maze-scan"
   ],
   "assetSha256": {
     ".nojekyll": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "Build/0906922291b002ada9d8fceaf4283374.data.unityweb": "898f400d5099f2a826c412fc374bbcd80cf6a0934f62642a43d98d558b8a59d9",
-    "Build/790bd4b6374f53a538ef1bfed9d0d12d.js.unityweb": "1813ea3e1f016462de5bd59caf01b79e311cd061444b9e3b02feb4684a57b107",
-    "Build/9d9c5b0ae7da99f0aca65b1b2cdc596c.wasm.unityweb": "a9f08300dea2379dbecd78183cdf048fcee17161420752ef98a2ec8222a01fe1",
+    "Build/0500bded5609cc9a6dbeb89c3a32708f.wasm.unityweb": "e7e918a66ea1a2aba67f4bd960954faddb3523bb5ab654e02409dfd63cef0f25",
+    "Build/164587e6d38a848d1cf46844d5be9647.data.unityweb": "b64cb2cc4a5a413b08051dbc0b1424b2569023ea50769bb06052e6303ecebb45",
+    "Build/5ed4f6bca0f8150eb8461904498abf76.js.unityweb": "8517b2037139ebdbb7b704c59340c62969cc83b8a1869ebff1b6427a84331a36",
     "Build/WebGL.loader.js": "3a1e1233c2d6c8a0eb4c8d7604a4cc056063b7bf34351d160b25f84a15027150",
-    "index.html": "abe8ce7af5758dff8116b8c2ac8a53a83a264d05bbed75180e60eb4a63db03d8",
-    "touch-controls.css": "e725ceb99d0296cccd28888db38bc5d6bd28d3662d97b0028bcdab24860aa8e4",
-    "touch-controls.js": "0f4afc2d0ad50688c5b969e876b98bf39887f597af082cf2ee40da1e5f5a1c22"
+    "index.html": "1b23212b5283205dced5f6175f45db0f75b349767ad3618d3b0368b1b2780d5d",
+    "touch-controls.css": "03b1ce186a02142f01cc72525deb09c5d227949906310266427f77667fca449c",
+    "touch-controls.js": "ddcdf2cf40a7b498baa4157c10314e472aa8cfb5ea75985410b6c3f60bf667a0"
   }
 }
