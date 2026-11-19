@@ -24,6 +24,20 @@ Shader "Hidden/Haunter/OutlineComposite"
                 return smoothstep(.20, .42, length(na - nb));
             }
 
+            float echoTrace(float2 maskUV, float2 depthUV, float2 pixel)
+            {
+                float2 centerUV = clamp(depthUV, pixel, 1 - pixel);
+                float4 center = tex2D(_CameraDepthNormalsTexture, centerUV);
+                float4 before = tex2D(_CameraDepthNormalsTexture, centerUV - pixel);
+                float4 after = tex2D(_CameraDepthNormalsTexture, centerUV + pixel);
+                float depth = DecodeFloatRG(center.zw);
+                float curvature = abs(DecodeFloatRG(before.zw) + DecodeFloatRG(after.zw) - 2 * depth)
+                    / max(.003, depth);
+                float contour = max(max(normalEdge(center, before), normalEdge(center, after)),
+                    smoothstep(.008, .035, curvature));
+                return contour * tex2D(_MainTex, saturate(maskUV)).r;
+            }
+
             fixed4 frag(v2f_img i) : SV_Target
             {
                 float2 uv = i.uv;
@@ -52,20 +66,30 @@ Shader "Hidden/Haunter/OutlineComposite"
                 reveal = max(reveal, tex2D(_MainTex, uv + float2(0, pixel.y)).r);
                 reveal = max(reveal, tex2D(_MainTex, uv - float2(0, pixel.y)).r);
                 float white = saturate((contour * reveal + mask.g) * _Brightness);
-                if (_HaunterInterference > .01)
+                if (_HaunterInterference > .12)
                 {
-                    // Preserve nearby contours and held props. Only the composite reveal
-                    // samples drift, so geometry, navigation and interaction never shift.
-                    float farEcho = smoothstep(3.1, 13.0, depth * _ProjectionParams.z);
-                    float amount = _HaunterInterference * farEcho * (1.0 - saturate(mask.g));
-                    float phase = 9.0 * uv.y + 7.0 * uv.x - _EchoTime * 1.7;
-                    float2 drift = float2(sin(phase), cos(phase * .72)) * (.012 * amount);
-                    float4 distant = tex2D(_CameraDepthNormalsTexture, saturate(depthUV + drift));
-                    float4 next = tex2D(_CameraDepthNormalsTexture, saturate(depthUV + drift + float2(pixel.x, pixel.y)));
-                    float delayedReveal = tex2D(_MainTex, saturate(uv + drift)).r;
-                    float interference = .58 + .28 * sin(phase + delayedReveal * 4.4);
-                    float ghost = normalEdge(distant, next) * delayedReveal * interference;
-                    white = saturate(white * (1.0 - .35 * amount) + ghost * amount * .92);
+                    // Two displaced traces make distant edges split rather than flicker.
+                    // Near edges and the persistent held outline still give stable bearings.
+                    float distanceFade = smoothstep(3.3, 9.7, depth * _ProjectionParams.z);
+                    float amount = smoothstep(.12, .86, _HaunterInterference)
+                        * distanceFade * (1.0 - saturate(mask.b));
+                    if (amount > .015)
+                    {
+                        float phase = 11 * uv.y + 6 * uv.x - _EchoTime * 1.1;
+                        float2 woven = float2(.72 + .28 * sin(phase), .36 * cos(phase * .8));
+                        float2 forward = woven * (.038 * amount);
+                        float2 backward = float2(-woven.x, .42 + woven.y) * (.024 * amount);
+                        // Sample in the native orientation of each render texture.
+                        float2 depthForward = forward;
+                        float2 depthBackward = backward;
+                        #if UNITY_UV_STARTS_AT_TOP
+                        if (_MainTex_TexelSize.y < 0) { depthForward.y *= -1; depthBackward.y *= -1; }
+                        #endif
+                        float first = echoTrace(uv + forward, depthUV + depthForward, pixel);
+                        float second = echoTrace(uv + backward, depthUV + depthBackward, pixel);
+                        float ghosts = max(first * .94, second * .68);
+                        white = saturate(white * (1.0 - .42 * amount) + ghosts * amount);
+                    }
                 }
                 // A subtle soft shoulder keeps narrow white lines comfortable on black.
                 white = pow(white, .82);

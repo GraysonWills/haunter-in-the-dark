@@ -1,9 +1,10 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace Haunter
 {
-    public enum SessionState { Ready, Playing, Paused, Caught, Escaped }
+    public enum SessionState { Ready, Playing, Paused, Caught, Escaped, Transitioning }
 
     [DisallowMultipleComponent]
     public sealed class GameSession : MonoBehaviour
@@ -21,6 +22,9 @@ namespace Haunter
         public SessionState State { get; private set; } = SessionState.Ready;
         public float ElapsedSeconds { get; private set; }
         public int SoundsMade { get; private set; }
+        public int CheckpointLevel { get; private set; }
+        public int LoadingLevel { get; private set; }
+        public int CompletedLevel { get; private set; }
 
         GUIStyle title, subtitle, label, small, body, button, centered, objective, numeral;
         GUIStyle tutorialHeading, tutorialCopy;
@@ -28,10 +32,14 @@ namespace Haunter
         float lastNoiseAt = -10f;
         string lastSound = "SILENCE";
         bool stylesReady;
+        static bool retryArchiveOnReload;
+        bool retryArchiveOnStart;
         ThrowGuide throwGuide;
         const float Width = 1600f, Height = 900f;
         const int ChargeRingSegments = 40;
+        const string CheckpointKey = "haunter.checkpoint.v1";
         static readonly Vector2[] ChargeRing = CreateChargeRing();
+        static readonly string[] ChapterNames = { "ARCHIVE", "COURTYARD", "BALLROOM", "FINAL MAZE" };
 
         void Awake()
         {
@@ -41,10 +49,23 @@ namespace Haunter
             Campaign = gameObject.AddComponent<HaunterCampaign>();
             Campaign.Initialize(this);
             ReducedDistortion = PlayerPrefs.GetInt("haunter.reducedDistortion", 0) != 0;
+            int checkpoint = PlayerPrefs.GetInt(CheckpointKey, 1);
+            CheckpointLevel = checkpoint >= 1 && checkpoint <= ChapterNames.Length ? checkpoint : 1;
             throwGuide = ReadThrowGuide();
             State = SessionState.Ready;
             Time.timeScale = 0f;
-            SetCursor(false);
+            retryArchiveOnStart = retryArchiveOnReload;
+            retryArchiveOnReload = false;
+            if (!retryArchiveOnStart) SetCursor(false);
+        }
+
+        void Start()
+        {
+            if (!retryArchiveOnStart) return;
+            State = SessionState.Playing;
+            Time.timeScale = 1f;
+            TouchControls.Reset();
+            PlayArchive(false);
         }
 
         void OnEnable() { NoiseSystem.Emitted += OnNoise; }
@@ -56,7 +77,7 @@ namespace Haunter
             {
                 Instance = null;
                 Time.timeScale = 1f;
-                SetCursor(false);
+                if (!retryArchiveOnReload) SetCursor(false);
             }
         }
 
@@ -75,20 +96,92 @@ namespace Haunter
 #if !UNITY_WEBGL || UNITY_EDITOR
             else if (State == SessionState.Paused && Input.GetKeyDown(KeyCode.Escape)) Resume();
 #endif
-            else if ((State == SessionState.Caught || State == SessionState.Escaped) && Input.GetKeyDown(KeyCode.R)) Restart();
+            else if (State == SessionState.Caught && Input.GetKeyDown(KeyCode.R)) RetryLevel();
+            else if (State == SessionState.Escaped && Input.GetKeyDown(KeyCode.R)) Restart();
         }
 
         public void Begin(bool skipTutorial = false)
         {
             if (State != SessionState.Ready) return;
+            int preview = BrowserBridge.PreviewLevel;
+            if (preview >= 2 && preview <= ChapterNames.Length)
+            {
+                EnterPlay();
+                if (Campaign.Enter(preview)) return;
+                PlayArchive(skipTutorial);
+                return;
+            }
+            StartLevel(skipTutorial || IsVerificationRun() ? 1 : CheckpointLevel, skipTutorial);
+        }
+
+        public void StartLevel(int level, bool skipTutorial = false)
+        {
+            if (State != SessionState.Ready || level < 1 || level > ChapterNames.Length) return;
+            if (level > 1)
+            {
+                SetCursor(true);
+                StartCoroutine(LoadLevel(level, 0));
+                return;
+            }
+            EnterPlay();
+            PlayArchive(skipTutorial);
+        }
+
+        void EnterPlay()
+        {
             State = SessionState.Playing;
             Time.timeScale = 1f;
             SetCursor(true);
-            int preview = BrowserBridge.PreviewLevel;
-            if (preview > 1 && Campaign.Enter(preview)) return;
+        }
+
+        void PlayArchive(bool skipTutorial)
+        {
             if (skipTutorial) Tutorial.Skip();
             else Tutorial.StartTutorial();
             if (Player != null) NoiseSystem.Emit(Player.transform.position + Vector3.up * .03f, 1.1f, NoiseKind.Intro, Player.gameObject);
+        }
+
+        static bool IsVerificationRun()
+        {
+            return BrowserBridge.SmokeRequested || BrowserBridge.TutorialSmokeRequested || BrowserBridge.ExpansionSmokeRequested
+                || BrowserBridge.CaptureShot > 0 || BrowserBridge.PreviewLevel > 1
+                || FindFirstObjectByType<PrototypeSmokeTest>() || FindFirstObjectByType<TutorialSmokeTest>();
+        }
+
+        IEnumerator LoadLevel(int level, int completed)
+        {
+            var previous = State;
+            LoadingLevel = level;
+            CompletedLevel = completed;
+            State = SessionState.Transitioning;
+            Time.timeScale = 0f;
+            if (Player) Player.CancelThrow();
+            TouchControls.Reset();
+            float minimumDisplay = completed > 0 ? 1.75f : .6f;
+            float shownAt = Time.realtimeSinceStartup;
+            yield return null; // Show the transition before synchronously building geometry and navigation.
+
+            if (!Campaign.Enter(level))
+            {
+                LoadingLevel = CompletedLevel = 0;
+                State = previous == SessionState.Playing ? SessionState.Paused : previous;
+                SetCursor(false);
+                Debug.LogError("Haunter: the next level could not be loaded.");
+                yield break;
+            }
+
+            if (completed > 0 && level > CheckpointLevel && !IsVerificationRun())
+            {
+                CheckpointLevel = level;
+                PlayerPrefs.SetInt(CheckpointKey, level);
+                PlayerPrefs.Save();
+            }
+
+            while (Time.realtimeSinceStartup - shownAt < minimumDisplay) yield return null;
+            LoadingLevel = CompletedLevel = 0;
+            TouchControls.Reset();
+            State = SessionState.Playing;
+            Time.timeScale = 1f;
         }
 
         public void Catch()
@@ -115,11 +208,16 @@ namespace Haunter
 
         public void ReachExit()
         {
-            if (State != SessionState.Playing) return;
+            if (State != SessionState.Playing || !Campaign.CanLeaveCourtyard) return;
             bool legacyTest = LevelNumber == 1 &&
                 (FindFirstObjectByType<PrototypeSmokeTest>() || FindFirstObjectByType<TutorialSmokeTest>());
             if (legacyTest || LevelNumber == 4) { Escape(); return; }
-            if (!Campaign.Enter(LevelNumber + 1)) Debug.LogError("Haunter: the next level could not be loaded.");
+            if (BrowserBridge.CaptureShot > 0)
+            {
+                if (!Campaign.Enter(LevelNumber + 1)) Debug.LogError("Haunter: the next level could not be loaded.");
+                return;
+            }
+            StartCoroutine(LoadLevel(LevelNumber + 1, LevelNumber));
         }
 
         public void ToggleDistortion()
@@ -149,9 +247,30 @@ namespace Haunter
         {
             Time.timeScale = 1f;
             SetCursor(false);
+            ReloadScene();
+        }
+
+        static void ReloadScene()
+        {
             Scene active = SceneManager.GetActiveScene();
             if (active.buildIndex >= 0) SceneManager.LoadScene(active.buildIndex);
             else if (!string.IsNullOrEmpty(active.path)) SceneManager.LoadScene(active.path);
+        }
+
+        public void RetryLevel()
+        {
+            if (State != SessionState.Caught && State != SessionState.Paused) return;
+            if (LevelNumber == 1)
+            {
+                retryArchiveOnReload = true;
+                SetCursor(true);
+                ReloadScene();
+                return;
+            }
+            ElapsedSeconds = 0f;
+            SoundsMade = 0;
+            SetCursor(true);
+            StartCoroutine(LoadLevel(LevelNumber, 0));
         }
 
         void OnApplicationFocus(bool focused)
@@ -232,9 +351,14 @@ namespace Haunter
             Matrix4x4 before = GUI.matrix;
             Color colorBefore = GUI.color;
             GUI.matrix = Matrix4x4.Scale(new Vector3(Screen.width / Width, Screen.height / Height, 1f));
-            if (State == SessionState.Playing) { if (!HaunterDeveloperView.IsActive) DrawHud(); }
+            if (State == SessionState.Playing)
+            {
+                var scan = Campaign.Room ? Campaign.Room.MazeOverview : null;
+                if (!HaunterDeveloperView.IsActive && !(scan && scan.Active)) DrawHud();
+            }
             else if (State == SessionState.Ready) DrawIntro();
             else if (State == SessionState.Paused) DrawPause();
+            else if (State == SessionState.Transitioning) DrawTransition();
             else DrawOutcome();
             GUI.matrix = before;
             GUI.color = colorBefore;
@@ -252,16 +376,40 @@ namespace Haunter
             Text(new Rect(112, 535, 640, 28), "It guards the exit. Draw it away, then slip past.", label, .72f);
             if (!TouchControls.Enabled)
             {
-                if (DrawButton(new Rect(110, 613, 330, 60), "ENTER THE DARK     /     ENTER")) Begin();
+                string start = CheckpointLevel > 1 ? "CONTINUE  /  " + ChapterNames[CheckpointLevel - 1] : "ENTER THE DARK     /     ENTER";
+                if (DrawButton(new Rect(110, 613, 330, 60), start)) Begin();
                 if (DrawButton(new Rect(110, 684, 330, 32), "PLAY WITHOUT TUTORIAL")) Begin(true);
                 Text(new Rect(110, 724, 750, 25), "WASD   MOVE       MOUSE   LOOK       " + PlayerController.CrouchKeys + "   CROUCH", small, .65f);
                 Text(new Rect(110, 753, 700, 25), "SPACE / RMB   TAP CANE       E   PICK UP       HOLD LMB   THROW", small, .65f);
                 Text(new Rect(110, 782, 700, 25), "Q   DROP       " + PlayerController.SprintKeys + "   RUN       ESC   PAUSE", small, .5f);
+                Fill(new Rect(1040, 294, 411, 354), .94f, false);
+                Text(new Rect(1080, 320, 310, 26), "CHOOSE A LEVEL", label, .72f);
+                for (int i = 0; i < ChapterNames.Length; i++)
+                    if (DrawButton(new Rect(1080, 365 + i * 62, 330, 48), (i + 1) + "  /  " + ChapterNames[i]))
+                        StartLevel(i + 1);
             }
             else Text(new Rect(110, 600, 900, 50), "LEFT STICK   MOVE     DRAG THE VIEW   LOOK", label, .7f);
             Fill(new Rect(110, 847, 1380, 1), .15f);
             Text(new Rect(110, 863, 700, 20), "A FICTIONAL ECHOLOCATION HORROR CONCEPT", small, .4f);
             Text(new Rect(1320, 863, 250, 20), "HEADPHONES ADVISED", small, .4f);
+        }
+
+        void DrawTransition()
+        {
+            // Keep the text and rings proportional even when a phone fills a portrait viewport.
+            var matrix = GUI.matrix;
+            float scale = Mathf.Min(Screen.width / 620f, Screen.height / 570f);
+            GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
+            float w = Screen.width / scale, h = Screen.height / scale;
+            var center = new Vector2(w * .5f, h * .5f);
+            Fill(new Rect(0, 0, w, h), 1f, false);
+            DrawEchoArtwork(center);
+            Fill(new Rect(center.x - 215, center.y - 80, 430, 160), .98f, false);
+            string context = CompletedLevel > 0 ? ChapterNames[CompletedLevel - 1] + " CLEARED" : "LEVEL " + LoadingLevel;
+            Text(new Rect(center.x - 200, center.y - 60, 400, 26), context, centered, .78f);
+            Text(new Rect(center.x - 200, center.y - 21, 400, 42), ChapterNames[LoadingLevel - 1], tutorialHeading, 1f);
+            Text(new Rect(center.x - 200, center.y + 36, 400, 26), CompletedLevel > 0 ? "ENTERING NEXT LEVEL" : "ENTERING LEVEL", centered, .62f);
+            GUI.matrix = matrix;
         }
 
         void DrawHud()
@@ -465,7 +613,7 @@ namespace Haunter
 #else
             if (DrawButton(new Rect(110, 490, 330, 60), "RESUME     /     ESC")) Resume();
 #endif
-            if (DrawButton(new Rect(110, 575, 330, 60), "START AGAIN")) Restart();
+            if (DrawButton(new Rect(110, 575, 330, 60), LevelNumber == 1 ? "RESTART ARCHIVE" : "RESTART LEVEL")) RetryLevel();
             if (Tutorial != null && Tutorial.Active && DrawButton(new Rect(110, 660, 330, 60), "SKIP TUTORIAL & RESUME"))
             {
                 Tutorial.Skip();
@@ -473,6 +621,7 @@ namespace Haunter
             }
             if (DrawButton(new Rect(110, LevelNumber == 1 && Tutorial.Active ? 726 : 660, 330, 36),
                 "REDUCED DISTORTION  /  " + (ReducedDistortion ? "ON" : "OFF"))) ToggleDistortion();
+            if (DrawButton(new Rect(462, 575, 245, 60), "LEVEL SELECT")) Restart();
             DrawEchoArtwork(new Vector2(1180, 460));
             Text(new Rect(110, 775, 900, 30), "SPACE / RMB  CANE     E  PICK UP     HOLD LMB  THROW     Q  DROP", small, .55f);
             Text(new Rect(110, 811, 1000, 30), "WASD  MOVE     " + PlayerController.CrouchKeys + "  CROUCH     " + PlayerController.SprintKeys + "  RUN     MOUSE  LOOK", small, .55f);
@@ -492,7 +641,11 @@ namespace Haunter
             Text(new Rect(110, 630, 220, 22), "TIME IN THE DARK", small, .5f);
             GUI.Label(new Rect(420, 570, 220, 60), SoundsMade.ToString("00"), numeral);
             Text(new Rect(420, 630, 250, 22), "SOUNDS LEFT BEHIND", small, .5f);
-            if (!TouchControls.Enabled && DrawButton(new Rect(110, 727, 330, 60), "TRY AGAIN     /     R")) Restart();
+            if (!TouchControls.Enabled)
+            {
+                if (!escaped && DrawButton(new Rect(110, 727, 330, 60), "TRY AGAIN     /     R")) RetryLevel();
+                if (DrawButton(new Rect(escaped ? 110 : 462, 727, 245, 60), "LEVEL SELECT")) Restart();
+            }
             Text(new Rect(110, 856, 900, 22), "HAUNTER IN THE DARK     /     CONCEPT 01", small, .4f);
         }
 

@@ -101,6 +101,31 @@ test('cane press is a one-shot pulse, with no synthetic-click duplicate', () => 
   get('touch-cane').emit('pointerup'); get('touch-cane').emit('click'); assert.equal(api.buttons(), 0);
 });
 
+test('maze scan is a one-shot control available in the maze between scans', () => {
+  const { api, get } = boot();
+  const scan = get('touch-scan');
+  api.update(1, 511, 1, 0, 0, 0);
+  assert.equal(scan.hidden, true);
+  scan.emit('pointerdown', { pointerId: 1 });
+  assert.equal(api.buttons(), 0);
+  api.update(1, 511, 1, 0, 0, 4);
+  assert.equal(scan.hidden, false);
+  scan.emit('pointerdown', { pointerId: 1 });
+  assert.equal(api.buttons(), 512);
+  scan.emit('pointerup', { pointerId: 1 });
+  scan.emit('click');
+  assert.equal(api.buttons(), 0);
+  get('touch-throw').emit('pointerdown', { pointerId: 2 });
+  api.update(1, 511, 1, 0, 0, 12);
+  assert.equal(scan.hidden, true);
+  assert.equal(api.buttons(), 256);
+  get('touch-cane').emit('pointerdown', { pointerId: 3 });
+  get('touch-pause').emit('pointerdown', { pointerId: 4 });
+  assert.equal(api.buttons(), 128);
+  api.update(1, 511, 1, 0, 0, 4);
+  assert.equal(scan.hidden, false);
+});
+
 test('pickup and throw remain usable when tutorial permits only those actions', () => {
   const { api, get } = boot(); api.update(1, 32, 0, 1, 0);
   get('touch-pickup').emit('pointerdown'); assert.equal(api.buttons(), 2);
@@ -193,10 +218,33 @@ test('native menu buttons target the existing Unity bridge and never run while P
   for (const state of [3, 4]) {
     api.update(state, 511, 0, 0, 0);
     assert.equal(get('touch-menu').hidden, false);
-    assert.equal(get('touch-restart').hidden, false);
+    assert.equal(get('touch-restart').hidden, state === 4);
+    assert.equal(get('touch-title').hidden, false);
     assert.equal(get('touch-resume').hidden, true);
     assert.equal(get('touch-skip').hidden, true);
   }
+});
+
+test('saved checkpoint, level choices and retry are shown in the appropriate menus', () => {
+  const { api, get, messages } = boot();
+  api.update(0, 511, 0, 0, 0, 0, 3, 1);
+  assert.equal(get('touch-begin').textContent, 'Continue · Ballroom');
+  assert.equal(get('touch-levels').hidden, false);
+  get('touch-level-4').emit('click');
+  assert.equal(messages[0][2], 'level-4');
+
+  api.update(5, 511, 0, 0, 0, 0, 3, 4);
+  assert.equal(get('touch-menu').hidden, true);
+  assert.equal(get('touch-controls').hidden, true);
+  assert.equal(get('touch-toggle').disabled, true);
+  get('touch-level-1').emit('click');
+  assert.equal(messages.length, 1);
+
+  api.update(3, 511, 0, 0, 0, 0, 3, 4);
+  assert.equal(get('touch-restart').textContent, 'Retry Final maze');
+  get('touch-restart').emit('click');
+  get('touch-title').emit('click');
+  assert.deepEqual(messages.slice(1).map(message => message[2]), ['restart', 'title']);
 });
 
 test('unsupported fullscreen uses an escapable full-frame layout, preserving the controls', async () => {

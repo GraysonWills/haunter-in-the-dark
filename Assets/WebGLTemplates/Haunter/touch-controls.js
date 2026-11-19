@@ -10,14 +10,18 @@
   const fullscreen = document.getElementById("fullscreen-button");
   const exitExpanded = document.getElementById("exit-expanded");
   const menu = document.getElementById("touch-menu");
+  const levels = document.getElementById("touch-levels");
   const tutorial = document.getElementById("touch-tutorial");
   const tutorialHeading = document.getElementById("touch-tutorial-heading");
   const tutorialCopy = document.getElementById("touch-tutorial-copy");
   const menuButtons = {
     begin: document.getElementById("touch-begin"), skip: document.getElementById("touch-skip"),
     resume: document.getElementById("touch-resume"), restart: document.getElementById("touch-restart"),
-    distortion: document.getElementById("touch-distortion")
+    distortion: document.getElementById("touch-distortion"), title: document.getElementById("touch-title"),
+    "level-1": document.getElementById("touch-level-1"), "level-2": document.getElementById("touch-level-2"),
+    "level-3": document.getElementById("touch-level-3"), "level-4": document.getElementById("touch-level-4")
   };
+  const levelNames = ["", "Archive", "Courtyard", "Ballroom", "Final maze"];
   const controls = {
     cane: { element: document.getElementById("touch-cane"), action: 16, pulse: 1 },
     pickup: { element: document.getElementById("touch-pickup"), action: 32, pulse: 2 },
@@ -25,8 +29,10 @@
     throw: { element: document.getElementById("touch-throw"), action: 64 },
     crouch: { element: document.getElementById("touch-crouch"), action: 4 },
     sprint: { element: document.getElementById("touch-sprint"), action: 8 },
-    pause: { element: document.getElementById("touch-pause"), action: 0, pulse: 128 }
+    pause: { element: document.getElementById("touch-pause"), action: 0, pulse: 128 },
+    scan: { element: document.getElementById("touch-scan"), action: 0, pulse: 512 }
   };
+  const scanAvailable = 4, scanActive = 8;
   const query = new URLSearchParams(window.location.search);
   const pointerLockAvailable = typeof canvas.requestPointerLock === "function";
   let enabled = query.get("touch") === "1" || (query.get("touch") !== "0"
@@ -41,11 +47,15 @@
   let nativeFullscreen = false;
   let uiSession = -1, uiActions = -1, uiHeld = null, uiNearby = -1, uiEnabled = null;
   let menuFlags = 1, uiMenuFlags = -1;
+  let checkpoint = 1, level = 1, uiCheckpoint = 0, uiLevel = 0;
   const pointers = new Map();
 
-  function allowed(mask) { return enabled && session === 1 && (mask === 0 || (actions & mask) !== 0); }
+  function allowed(mask) {
+    return enabled && session === 1 && (mask === 0 || (!(menuFlags & scanActive) && (actions & mask) !== 0));
+  }
   function usable(name) {
     const item = controls[name];
+    if (name === "scan") return allowed(0) && (menuFlags & scanAvailable) !== 0 && !(menuFlags & scanActive);
     if (name === "pickup" && nearby === 2) return allowed(256);
     return allowed(item.action) && (name !== "pickup" || (nearby === 1 && !held))
       && ((name !== "throw" && name !== "drop") || held);
@@ -165,7 +175,8 @@
     if (!element) continue;
     element.addEventListener("click", event => {
       event.preventDefault(); event.stopPropagation();
-      if (!enabled || session === 1 || !window.unityInstance) return;
+      if (!enabled || session === 1 || session === 5 || !window.unityInstance || element.hidden) return;
+      if (action.startsWith("level-") && session !== 0) return;
       reset();
       window.unityInstance.SendMessage("Haunter browser bridge", "TouchMenuAction", action);
     });
@@ -191,7 +202,7 @@
     }
   }
   toggle.addEventListener("change", () => {
-    if (session === 1) { toggle.checked = enabled; return; }
+    if (session === 1 || session === 5) { toggle.checked = enabled; return; }
     reset(); enabled = toggle.checked; refreshMode();
   });
   function ready() {
@@ -201,26 +212,35 @@
       ? "Tap Begin. Use the left stick to move and drag the scene to look. Landscape gives you more room."
       : "Press Enter or click Begin to play. Esc pauses and releases the mouse.";
   }
-  function update(nextSession, nextActions, nextHeld, nextNearby, charge, flags = menuFlags) {
+  function update(nextSession, nextActions, nextHeld, nextNearby, charge, flags = menuFlags, nextCheckpoint = checkpoint, nextLevel = level) {
     if (nextSession !== session) reset();
     session = nextSession; actions = nextActions; held = !!nextHeld; nearby = nextNearby;
     menuFlags = flags;
-    if (uiSession !== session || uiActions !== actions || uiHeld !== held || uiNearby !== nearby || uiEnabled !== enabled || uiMenuFlags !== menuFlags) {
+    checkpoint = nextCheckpoint;
+    level = nextLevel;
+    if (uiSession !== session || uiActions !== actions || uiHeld !== held || uiNearby !== nearby || uiEnabled !== enabled || uiMenuFlags !== menuFlags || uiCheckpoint !== checkpoint || uiLevel !== level) {
       uiSession = session; uiActions = actions; uiHeld = held; uiNearby = nearby; uiEnabled = enabled; uiMenuFlags = menuFlags;
+      uiCheckpoint = checkpoint; uiLevel = level;
       layer.hidden = !enabled || session !== 1;
-      menu.hidden = !enabled || session === 1 || window.haunterLoadingState !== "ready";
-      tutorial.hidden = !enabled || session !== 1 || !tutorialHeading.textContent;
+      layer.classList.toggle("maze-scan-active", !!(menuFlags & scanActive));
+      controls.scan.element.hidden = !usable("scan");
+      menu.hidden = !enabled || session === 1 || session === 5 || window.haunterLoadingState !== "ready";
+      tutorial.hidden = !enabled || session !== 1 || !tutorialHeading.textContent || !!(menuFlags & scanActive);
       menuButtons.begin.hidden = session !== 0;
+      menuButtons.begin.textContent = checkpoint > 1 ? "Continue · " + levelNames[checkpoint] : "Begin";
+      levels.hidden = session !== 0;
       menuButtons.skip.hidden = session !== 0 && (session !== 2 || !(menuFlags & 1));
       menuButtons.skip.textContent = session === 0 ? "Skip tutorial" : "Skip tutorial & resume";
       menuButtons.resume.hidden = session !== 2;
-      menuButtons.restart.hidden = session === 0 || session === 1;
+      menuButtons.restart.hidden = session !== 2 && session !== 3;
+      menuButtons.restart.textContent = (session === 3 ? "Retry " : "Restart ") + levelNames[level];
+      menuButtons.title.hidden = session < 2 || session === 5;
       if (menuButtons.distortion) {
         menuButtons.distortion.hidden = session !== 2;
         menuButtons.distortion.setAttribute("aria-pressed", String(!!(menuFlags & 2)));
         menuButtons.distortion.textContent = (menuFlags & 2) ? "Reduced distortion on" : "Reduce distortion";
       }
-      toggle.disabled = session === 1;
+      toggle.disabled = session === 1 || session === 5;
       stick.classList.toggle("touch-unavailable", !allowed(2));
       stick.setAttribute("aria-disabled", String(!allowed(2)));
       for (const [id, pointer] of pointers) {
@@ -244,7 +264,7 @@
     tutorialHeading.textContent = heading;
     tutorialCopy.textContent = copy;
     tutorial.setAttribute("data-frozen", String(frozen));
-    tutorial.hidden = !enabled || session !== 1 || !heading;
+    tutorial.hidden = !enabled || session !== 1 || !heading || !!(menuFlags & scanActive);
   }
   function pointerLockFailed() {
     if (enabled || window.haunterLoadingState !== "ready") return;

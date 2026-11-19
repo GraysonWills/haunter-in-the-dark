@@ -74,6 +74,7 @@
       <canvas id="unity-canvas" width="1280" height="720" tabindex="0" aria-label="Haunter in the Dark game. Press Enter to begin. Use WASD and mouse to move."></canvas>
       <div id="touch-controls" hidden aria-label="Touch game controls">
         <button id="touch-pause" type="button">Pause</button>
+        <button id="touch-scan" type="button" hidden>Maze scan</button>
         <div id="touch-stick" role="group" aria-label="Movement stick. Drag up to move forward." aria-disabled="true"><span id="touch-thumb"></span><span class="touch-stick-label">MOVE</span></div>
         <div class="touch-movement"><button id="touch-crouch" type="button" aria-pressed="false">Crouch</button><button id="touch-sprint" type="button">Hold to run</button></div>
         <div class="touch-actions"><button id="touch-cane" type="button">Tap cane</button><button id="touch-pickup" type="button">Pick up</button><button id="touch-drop" type="button">Drop</button><button id="touch-throw" type="button">Hold to throw</button></div>
@@ -82,7 +83,21 @@
         <strong id="touch-tutorial-heading" data-tutorial-heading></strong>
         <p id="touch-tutorial-copy" data-tutorial-copy></p>
       </aside>
-      <div id="touch-menu" hidden aria-label="Game menu"><button id="touch-begin" type="button">Begin</button><button id="touch-resume" type="button" hidden>Resume</button><button id="touch-restart" type="button" hidden>Start again</button><button id="touch-skip" type="button">Skip tutorial</button><button id="touch-distortion" type="button" hidden aria-pressed="false">Reduce distortion</button></div>
+      <div id="touch-menu" hidden aria-label="Game menu">
+        <button id="touch-begin" type="button">Begin</button>
+        <button id="touch-resume" type="button" hidden>Resume</button>
+        <button id="touch-restart" type="button" hidden>Restart level</button>
+        <button id="touch-title" type="button" hidden>Level select</button>
+        <button id="touch-skip" type="button">Skip tutorial</button>
+        <button id="touch-distortion" type="button" hidden aria-pressed="false">Reduce distortion</button>
+        <div id="touch-levels" role="group" aria-label="Choose a level">
+          <span>Choose a level</span>
+          <button id="touch-level-1" type="button">1 · Archive</button>
+          <button id="touch-level-2" type="button">2 · Courtyard</button>
+          <button id="touch-level-3" type="button">3 · Ballroom</button>
+          <button id="touch-level-4" type="button">4 · Final maze</button>
+        </div>
+      </div>
       <button id="exit-expanded" type="button" hidden>Exit expanded view</button>
       <div class="cover" id="cover">
         <div class="echo-mark" aria-hidden="true"></div>

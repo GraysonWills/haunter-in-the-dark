@@ -82,8 +82,12 @@ namespace Haunter
             fixtures.Add("Skipped the separate guided-opening suite and staged the player beside the archive exit.");
             game.Creature.CatchSuppressed = true;
             game.Player.EnterLevel(game.Exit.position);
-            yield return WaitFor(() => game.LevelNumber == 2, 3f);
-            if (!Check(game.LevelNumber == 2, "Real archive exit trigger enters the courtyard")) { Finish(); yield break; }
+            yield return WaitFor(() => game.State == SessionState.Transitioning, 2f);
+            Check(game.State == SessionState.Transitioning && game.CompletedLevel == 1 && game.LoadingLevel == 2 && Time.timeScale == 0,
+                "The live archive exit shows the cleared level and freezes the world while the courtyard loads");
+            yield return WaitFor(() => game.LevelNumber == 2 && game.State == SessionState.Playing, 3f);
+            if (!Check(game.LevelNumber == 2 && game.State == SessionState.Playing,
+                "Real archive exit trigger enters the courtyard")) { Finish(); yield break; }
 
             yield return TestCourtyard();
             if (game.LevelNumber != 3) { Finish(); yield break; }
@@ -102,9 +106,18 @@ namespace Haunter
             Check(!Physics.Linecast(crossingFrom, crossingTo, 1, QueryTriggerInteraction.Ignore), "Lower crossing begins open");
             Check(room.NavMeshReady && listener.Role == ListenerRole.Roamer, "Courtyard has a navigation mesh and a roaming listener");
 
-            yield return WaitFor(() => game.Campaign.CrossingCollapsed, 7f);
-            Check(game.Campaign.CrossingCollapsed && collapseSounds == 1 && NoiseSystem.Instance.ActivePulseCount > 0,
-                "Timed collapse sends one crash event and an echo wave");
+            yield return new WaitForSeconds(3.7f);
+            Check(game.Campaign.IntroStage == "Crossing" && collapseSounds == 0,
+                "Waiting beside the archive does not start the courtyard collapse");
+            yield return WalkPath(room.CrossingLookout, false, 8f);
+            Check(room.HasReachedCrossing(game.Player.transform.position) && game.Campaign.IntroStage == "Collapse"
+                && !Physics.Linecast(crossingFrom, crossingTo, 1, QueryTriggerInteraction.Ignore),
+                "Walking halfway across the courtyard begins the visible fall before the lower entry is blocked");
+            float observedFall = Time.time;
+            yield return WaitFor(() => game.Campaign.CrossingCollapsed, 4f);
+            Check(game.Campaign.CrossingCollapsed && collapseSounds == 1 && NoiseSystem.Instance.ActivePulseCount > 0
+                && Time.time - observedFall >= 2f,
+                "The structure falls over several seconds before one crash event sends an echo");
             Check(Physics.Linecast(crossingFrom, crossingTo, 1, QueryTriggerInteraction.Ignore),
                 "Fallen masonry physically closes the lower crossing");
             Check(room.NavMeshReady && FindPath(room.Spawn, room.Exit.position, out _), "Rebaked courtyard retains a complete upstairs route");
@@ -131,12 +144,17 @@ namespace Haunter
                     "Courtyard creature physically returns to its authored route and resumes patrol");
             }
 
-            fixtures.Add("Staged at the courtyard side stairs. Real crouch movement, colliders, the ramp and the upstairs trigger remain active.");
-            if (game.State == SessionState.Playing && FindPath(room.UpstairsApproach, room.Exit.position, out _))
+            fixtures.Add("Walked from the archive door to the halfway trigger, then crouched back to the side stairs and the live upstairs exit.");
+            if (game.State == SessionState.Playing && FindPath(game.Player.transform.position, room.UpstairsApproach, out _))
             {
-                game.Player.EnterLevel(room.UpstairsApproach);
+                Vector3 collapseLookout = game.Player.transform.position;
+                yield return WalkPath(room.UpstairsApproach, true, 14f);
+                Check(Vector3.Distance(game.Player.transform.position, room.UpstairsApproach) < .6f
+                    && collapseLookout.z - game.Player.transform.position.z > 4f,
+                    "The player can backtrack from the crash through the yard and reach the side stairs");
                 yield return WalkPath(room.Exit.position, true, 24f);
             }
+            yield return WaitFor(() => game.LevelNumber == 3 && game.State == SessionState.Playing, 3f);
             Check(game.LevelNumber == 3, "Crouching up the alternate route reaches the ballroom through its live exit");
         }
 
@@ -149,13 +167,27 @@ namespace Haunter
             bool hasWall = Physics.Raycast(probe, directions, out var wall, 4f, 1, QueryTriggerInteraction.Ignore);
             bool hasRoute = FindPath(room.Spawn, room.Exit.position, out var originalRoute);
             Check(room.QuietZones.Length > 0 && hasRoute && hasWall, "Ballroom has a walkable exit route, fixed walls and quiet spaces");
+            bool tableBlocksCenter = Physics.Raycast(room.Spawn + Vector3.up * .65f, Vector3.forward,
+                out var table, 5f, 1, QueryTriggerInteraction.Ignore) && table.collider.name == "Entrance service table";
+            Check(tableBlocksCenter && hasRoute && originalRoute.corners.Length > 2,
+                "Solid ballroom furniture interrupts the center lane and leaves a route around it");
             game.Player.TapCane();
             float clearLoad = NoiseSystem.Instance.AcousticLoad;
             Check(clearLoad < .5f && NoiseSystem.Instance.ActivePulseCount > 0, "One cane tap reveals the room at low acoustic load");
+            yield return WaitFor(() => game.Campaign.HintHeading == "ECHOES OVERLAP" &&
+                NoiseSystem.Instance.AcousticLoad > .85f, 5f);
+            Check(game.Campaign.HintHeading == "ECHOES OVERLAP" && NoiseSystem.Instance.AcousticLoad > .85f,
+                "The playable ballroom entry demonstrates clear and overlapping echoes");
+            yield return WaitFor(() => game.Campaign.HintHeading == "LET THE ECHOES FADE", 4f);
+            Check(game.Campaign.HintHeading == "LET THE ECHOES FADE" && NoiseSystem.Instance.AcousticLoad < .73f,
+                "The demonstration fades while the ballroom creature keeps patrolling");
 
-            fixtures.Add("Injected several coincident cane-strength events near the ballroom patrol to make overlap repeatable.");
-            // Keep the real player at the doorway. The artificial sounds give the creature
-            // evidence it can pursue without moving the test player or the room's geometry.
+            fixtures.Add("Staged the listener at its authored ballroom spawn and injected cane-strength events beside the north-west column.");
+            // The entry lesson lets the patrol reach different locations depending on frame
+            // timing. Use a fixed, walkable reflecting surface for the separate hearing check.
+            var agent = listener.GetComponent<NavMeshAgent>();
+            if (!Check(NavMesh.SamplePosition(room.CreatureSpawn, out var stage, 1.2f, NavMesh.AllAreas)
+                && agent.Warp(stage.position), "The ballroom hearing fixture starts on the authored patrol route")) yield break;
             Vector3 origin = listener.transform.position + new Vector3(1.8f, .15f, -.8f);
             for (int i = 0; i < 5; ++i) NoiseSystem.Emit(origin, 1.35f, NoiseKind.Cane);
             Check(NoiseSystem.Instance.AcousticLoad > .75f, "Overlapping real acoustic events raise the bounded interference load");
@@ -194,6 +226,7 @@ namespace Haunter
             {
                 game.Player.EnterLevel(room.Exit.position + Vector3.back * 1.75f);
                 yield return WalkPath(room.Exit.position, true, 6f);
+                yield return WaitFor(() => game.LevelNumber == 4 && game.State == SessionState.Playing, 4f);
             }
             Check(game.LevelNumber == 4, "Real ballroom exit trigger reaches the two-creature maze");
         }
@@ -205,6 +238,24 @@ namespace Haunter
             var roamer = game.Campaign.SecondCreature;
             if (!Check(guard && roamer && guard.Role == ListenerRole.ExitGuard && roamer.Role == ListenerRole.Roamer,
                 "Final maze has an exit guard and a separate patrol creature")) yield break;
+            var overview = room.MazeOverview;
+            if (!Check(overview, "Maze creates an overhead scan from the loaded room")) yield break;
+            yield return WaitFor(() => overview.Active, 2f);
+            Check(overview.Active && Time.timeScale == 0f, "Maze entry plays the overhead scan before play resumes");
+            yield return null;
+            Vector3 entry = game.Player.transform.position;
+            Vector3 restingRoamer = roamer.transform.position;
+            yield return new WaitForSecondsRealtime(.2f);
+            Check(Vector3.Distance(entry, game.Player.transform.position) < .02f
+                && Vector3.Distance(restingRoamer, roamer.transform.position) < .02f,
+                "Both the player and roamer stay still during the opening scan");
+            yield return WaitFor(() => !overview.Active, 2f);
+            Check(!overview.Active && Time.timeScale > 0f, "The scan returns to live play on its own");
+            Check(Vector3.Distance(entry, restingRoamer) >= 15f
+                && Array.TrueForAll(room.Patrol, point => Vector3.Distance(entry, point) >= 14f),
+                "The roamer and every patrol waypoint start clear of the entrance");
+            Check(overview.TryOpen(), "The maze scan can be replayed during play");
+            yield return WaitFor(() => !overview.Active, 2f);
             Check(FindPath(room.Spawn, room.FinalStaging, out _) && FindPath(room.FinalStaging, room.Exit.position, out _),
                 "Maze lanes connect the spawn, throw area and final door");
 

@@ -29,17 +29,18 @@ Top-down plan, approximately 26 × 31 m plus the recessed archive service arch. 
  │       ↑          crash       north apron   ║ │  ▓  rubble blocks entrance at z≈13.7
  │       │                                     ║│  U  upstairs door (10, 13), y ≈ 2.8
  │   planter      exposed paving    planter   ║ │  ║  raised balcony above east lane
- │       │         dry fountain        │     ╱  │  ╱  east service ramp, z −6 to +4
+ │       │      dry fountain  H        │     ╱  │  H  halfway trigger, z ≈ −0.65
+ │       │                             │     ╱  │  ╱  east service ramp, z −6 to +4
  │       └── cover ─────┬──── cover ─────┘    ↑ │
  │                     open shortcut         │  │
  │ Archive recess M      S ─────── east lane ─┘ │  M  creature at the service arch (−4, −17.05)
  └──────────────────────────────────────────────┘  S  arrival (2.8, −13.3)
 ```
 
-1. Step out near the archive and hear enough of the space to identify the entrance opposite. The crossing collapses ahead. A strong wave outlines the fountain, arcades, rubble and the ramp rail. The ground route becomes physically blocked.
-2. Turn back toward the archive as the creature charges toward the crash. Keep any guided turn brief and protect the player during it. The creature slows to inspect the debris, then joins its authored patrol.
-3. Choose the exposed shortcut with the fountain at `(−0.4, 1.1)` as a midway landmark, or trace the perimeter from cover to cover. The west arcade piers and stone screen distinguish one route from the east service bench and east planter. Props near cover let the player redirect the creature before advancing. An opening sends the player up the east ramp and along the balcony to the upstairs door.
-4. Verify the rubble blocks movement, the ramp and balcony form a complete route, and the creature can reach the collapse then return to patrol without teleporting. Time a thrown-object investigation from arrival through release.
+1. Cross about half the courtyard before the timber supports buckle. The same arch and canopy pieces tumble in sequence for 2.7 seconds. The final crash sends a strong wave through the yard and the fallen masonry physically blocks the entry.
+2. Look back toward the archive as the creature charges toward the crash. The brief guided turn protects the player while the creature emerges. The creature slows to inspect the debris, then joins its authored patrol.
+3. Backtrack to the base of the east stairs. Cut across the yard beside the fountain at `(−0.4, 1.1)` or move from cover to cover along the perimeter. The west arcade piers and stone screen distinguish one route from the east service bench and east planter. Use props to redirect the creature, then take the east ramp and balcony to the upstairs door.
+4. Verify that waiting beside the archive leaves the crossing open, walking halfway starts the staged fall, and landing debris blocks the ground route. Walk back to the stairs and through the live upstairs exit. Check that the creature reaches the crash, inspects it for five seconds, and returns to its patrol.
 
 ## Level 3 · Ballroom
 
@@ -52,14 +53,14 @@ Top-down plan, approximately 30 × 38 m. The curtain alcoves center on `(±12.95
  │       ↑         raised stage         ↑       │
  │  Q ── A ─ o                      o ─ A ─ Q   │  Q  quieter curtain alcoves
  │       │ seats      dance floor   seats│      │  A  alcove entrances
- │       │      o     resonant panels o  │      │  o  columns and route landmarks
+ │       │      o   F · F · F · F    o  │      │  F  staggered solid furniture
  │       └────────────┬─────────────────┘       │
  │                 S  lobby                     │  S  arrival (0, −16)
  └──────────────────────────────────────────────┘
 ```
 
-1. Leave the lobby and make a single tap to learn the relationship between the near columns and the distant stage. Let the direct reveal read clearly before the first set of returns.
-2. Overlapping footfalls, taps and impacts add delayed, dimmer contours across the open floor. Near silhouettes, held objects and interaction cues remain readable. The quieter side alcoves give overlaps time to decay and reconnect to the bypasses around the stage.
+1. Tap the cane in the lobby to see a clean reveal. A short series of room echoes follows it, then fades even while the creature keeps patrolling.
+2. Weave around the service table, display pedestal, folding screen, and banquet table. Overlapping footfalls, taps, and impacts split and bend the distant outlines. Nearby silhouettes and held objects stay readable. Quieter alcoves reconnect to the routes around the stage.
 3. Derive reflections from the originating event and nearby authored surfaces. Delay and attenuate them, cap how many can remain active, and let them expire. Mix a stable nearby outline with fading or slightly displaced distant contours. Reduced distortion suppresses the contour interference while preserving the underlying sound events. All collisions, interactions and navigation stay in place.
 4. The creature uses the same returns to form an estimate. Weak or overlapping evidence can make it listen longer or turn toward a reachable reflection. Confidence and remembered positions decay. A committed throw remains locked to its chosen destination until the five-second investigation ends.
 5. Verify a clear and overloaded view from the same position against unchanged geometry. Test reduced distortion, an apparent reflection that causes a wrong estimate, and the absence of repeated investigations from one echo chain.
@@ -82,10 +83,11 @@ Top-down plan, approximately 24 × 27 m. Three partition rows at `z −8.2`, `�
  └──────────────────────────────────────────────┘
 ```
 
-1. Follow a loop to the covered gallery. The roaming creature's footstep cadence marks a moving route, while the guard's paws locate the exit post. A throw toward the west landing can draw the rover while the guard stays near the door.
-2. Pick up the second prop at the staging point. Throw toward the east landing while the rover is still committed. Once both are occupied, cross the central approach to the door. If the first investigation is about to end, use cover and set up again.
-3. The center route measures approximately 7.1 m from staging to the exit threshold. Staging is beyond the guard's crouch hearing range. Walking at 2.8 m/s takes about 2.54 seconds once both creatures are committed. Native testing recorded 3.90 seconds of overlapping investigations and reached the actual exit with both catches active.
-4. Verify two owners for two separate throws, one owner for all reflections and bounces from each throw, and independent timers that start on each creature's arrival. Show the guard and rover each returning to their role after expiry.
+1. Read the quick overhead scan of the actual maze walls. It marks your heading and the exit and can be replayed with M or the touch scan button. The rover begins on a northbound leg away from the entrance.
+2. Follow a loop to the covered gallery. The roaming creature's footstep cadence marks a moving route, while the guard's paws locate the exit post. A throw toward the west landing can draw the rover while the guard stays near the door.
+3. Pick up the second prop at the staging point. Throw toward the east landing while the rover is still committed. Once both are occupied, cross the central approach to the door. If the first investigation is about to end, use cover and set up again.
+4. The center route measures approximately 7.1 m from staging to the exit threshold. Staging is beyond the guard's crouch hearing range. Walking at 2.8 m/s takes about 2.54 seconds once both creatures are committed.
+5. Verify two owners for two separate throws, one owner for all reflections and bounces from each throw, and independent timers that start on each creature's arrival. Show the guard and rover each returning to their role after expiry.
 
 ## Original sound palette
 

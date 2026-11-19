@@ -26,7 +26,9 @@ This repository's live GitHub Pages site publishes from the root of the `codex/p
 
 Select **Play in browser** to load the game, then use the game's start button or Enter. On desktop, a click on the canvas captures the mouse if the browser supports it. If mouse capture is unavailable, drag to look and use the keyboard to move. Escape opens the pause menu. Audio starts after interaction with the page. Fullscreen is available from the page button.
 
-Use WASD to move. Hold **either Shift key or C** to crouch, and hold **R** to sprint. **Shift + W** moves forward quietly; **R + W** runs forward. These browser bindings avoid the Ctrl + W tab-closing shortcut. Crouching takes priority if both crouch and sprint are held. R still restarts the game after an ending. The Windows player retains Ctrl/C for crouching and Shift for sprinting.
+In v0.7.0, the title screen lets you start any level or continue from the farthest entrance you reached. The browser saves checkpoints in the current site and profile. Retry restarts the current level. During the final maze, press **M** or tap **Maze scan** to view the overhead echo again.
+
+Use WASD to move. Hold **either Shift key or C** to crouch, and hold **R** to sprint. **Shift + W** moves forward quietly. **R + W** runs forward. These browser bindings avoid the Ctrl + W tab-closing shortcut. Crouching takes priority if both crouch and sprint are held. Press R after being caught to retry the current level. The Windows player retains Ctrl/C for crouching and Shift for sprinting.
 
 Hold left mouse while carrying an object to charge it. The ring around the crosshair fills and the object draws back. The aim arc shows the intended flight before any collision. Press **Space** or right mouse while charging to reveal nearby obstacles with the cane.
 
@@ -38,7 +40,7 @@ Touch mode activates automatically on compatible touch devices. Use the **Touch 
 - Tap **Cane** to send an echo. Tap **Pick up** or **Exit** when the corresponding interaction is available.
 - Hold **Throw** to charge, then release. Tap **Cane** with a second finger to reveal surfaces while charging. Tap **Drop** to put down the held object.
 - Tap **Crouch** to toggle quiet movement; hold **Sprint** while moving to run.
-- Tap **Pause** to open the menu. Its large buttons provide **Resume**, **Start again**, and **Skip tutorial & resume**. The touch title screen offers **Skip tutorial**; the desktop title labels that option **Play without tutorial**.
+- Tap **Pause** to open the menu for **Resume**, **Restart level**, and **Level select**. While the archive tutorial is active, **Skip tutorial & resume** is also available. The title screen's **Skip tutorial** starts in the archive with the guided opening skipped.
 
 Multiple touches can move, look and use actions together. The tutorial prompts adapt to touch input and limit controls to the current lesson, including pickup and throwing while game time is frozen. Touch mode does not request mouse capture or pause because mouse capture is unavailable. Leaving the browser window or hiding the page still pauses the game and clears held controls. Pointer cancellation clears movement and cancels a charged throw rather than throwing accidentally.
 

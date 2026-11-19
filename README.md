@@ -6,7 +6,9 @@ A playable first-person Unity horror concept. Sound is your only sight: footstep
 
 ## Four-level release
 
-The courtyard, ballroom, and final maze follow the original archive tutorial. Find a route upstairs after a collapse, let overlapping echoes settle in the ballroom's quiet alcoves, and give each maze creature its own distraction.
+In v0.7.0, walk into the courtyard to trigger the collapse, then backtrack to the side stairs. In the ballroom, try the opening cane tap and use the gaps between the furniture. The final maze starts with an overhead echo so you can orient yourself before moving.
+
+Choose any of the four levels from the title screen. Clearing a level saves the farthest entrance you reached on this device or browser. **Continue** opens that checkpoint and **Retry** restarts the current level. The transition screen names the level you cleared and the area you're entering.
 
 On the pause menu, **Reduce distortion** softens the ballroom's overlapping outlines. It leaves collisions, reach and routes fixed. The [expansion design](docs/EXPANSION-DESIGN.md) includes the maps, encounter walkthroughs, and research.
 
@@ -46,7 +48,8 @@ The browser and Windows releases include all four levels and the updated throw g
 | Drop the held object | Q | Q |
 | Pause and release the cursor | Esc | Esc |
 | Resume | Enter or click Resume | Esc or click Resume |
-| Restart after an ending | R | R |
+| Retry after being caught | R | R |
+| Replay the overhead scan in the final maze | M | M |
 | Skip the guided opening | T, or the pause-menu button | T, or the pause-menu button |
 
 In the browser, **Shift + W** moves forward quietly and **R + W** sprints. Ctrl is not a browser movement binding, so crouching does not require the Ctrl + W tab-closing shortcut. Close the browser tab to leave the web game, or use Alt + F4 for the Windows player.
@@ -64,6 +67,7 @@ In the browser, **Shift + W** moves forward quietly and **R + W** sprints. Ctrl 
 | Crouch and move quietly | Tap **Crouch** to toggle it on or off |
 | Sprint | Hold **Sprint** while moving |
 | Pause / resume | Tap **Pause**, then **Resume** |
+| Replay the final maze scan | Tap **Maze scan** |
 | Skip the guided opening | Use **Skip tutorial** on the title screen, or **Pause → Skip tutorial & resume** |
 
 Movement, looking and action buttons support simultaneous touches. The tutorial enables only the controls needed for its current step. Leaving the page pauses the game and clears held inputs; an interrupted throw is canceled instead of releasing the object.

@@ -7,7 +7,7 @@ namespace Haunter
     public static class TouchControls
     {
         public const int Cane = 1, Pickup = 2, Drop = 4, ThrowHeld = 8, ThrowReleased = 16,
-            Crouch = 32, Sprint = 64, Pause = 128, CancelThrow = 256;
+            Crouch = 32, Sprint = 64, Pause = 128, CancelThrow = 256, Scan = 512;
         static int frame = -1, buttons;
         static Vector2 move, look;
 
@@ -16,7 +16,8 @@ namespace Haunter
         [DllImport("__Internal")] static extern float Haunter_TouchAxis(int axis);
         [DllImport("__Internal")] static extern int Haunter_TouchButtons();
         [DllImport("__Internal")] static extern void Haunter_ResetTouchInput();
-        [DllImport("__Internal")] static extern void Haunter_UpdateTouchState(int state, int actions, int held, int nearby, float charge, int menuFlags);
+        [DllImport("__Internal")] static extern void Haunter_UpdateTouchState(int state, int actions, int held, int nearby,
+            float charge, int menuFlags, int checkpoint, int level);
         [DllImport("__Internal")] static extern void Haunter_UpdateTouchTutorial(string heading, string instruction, int frozen);
         static TutorialDirector lastTutorial;
         static TutorialStage lastStage;
@@ -74,9 +75,12 @@ namespace Haunter
                 nearby = 2;
             int menuFlags = (session.Tutorial != null && session.Tutorial.Active ? 1 : 0)
                 | (session.ReducedDistortion ? 2 : 0);
+            var room = session.Campaign.Room;
+            if (room && room.MazeOverview)
+                menuFlags |= 4 | (room.MazeOverview.Active ? 8 : 0);
             Haunter_UpdateTouchState((int)session.State, player != null ? (int)player.AllowedActions : 0,
                 player != null && player.HeldObject != null ? 1 : 0, nearby,
-                player != null ? player.ThrowCharge : 0f, menuFlags);
+                player != null ? player.ThrowCharge : 0f, menuFlags, session.CheckpointLevel, session.LevelNumber);
             var tutorial = session.Tutorial;
             if (!Enabled || tutorial == null || !tutorial.Active)
             {

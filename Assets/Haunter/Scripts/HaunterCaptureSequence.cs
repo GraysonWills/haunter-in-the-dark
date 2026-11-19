@@ -94,15 +94,18 @@ namespace Haunter
             game.Player.TapCane();
             yield return new WaitForSecondsRealtime(.5f);
             yield return WalkPath(game.Exit.position, true, 5f);
+            yield return Until(() => game.LevelNumber == 2 && game.State == SessionState.Playing, 4f);
             if (game.LevelNumber != 2) { Fail("The real archive exit did not enter the courtyard."); yield break; }
 
             var room = game.Campaign.Room;
             Mark("crossing", "AN OPEN CROSSING", "The apparent doorway is still open.");
             LookAt(room.ApparentCrossing + Vector3.up);
             game.Player.TapCane();
-            yield return Until(() => game.Campaign.CrossingCollapsed, 8f);
+            yield return WalkPath(room.CrossingLookout, false, 8f);
+            if (game.Campaign.IntroStage != "Collapse") { Fail("Walking halfway did not trigger the collapse."); yield break; }
+            Mark("collapse", "THE CROSSING COLLAPSES", "The whole canopy and arch fall before the live crash blocks the doorway.");
+            yield return Until(() => game.Campaign.CrossingCollapsed, 4f);
             if (!game.Campaign.CrossingCollapsed) { Fail("The crossing collapse was not observed."); yield break; }
-            Mark("collapse", "THE CROSSING COLLAPSES", "The crash emits a live echo and blocks the doorway.");
             yield return Until(() => game.Creature.IsCommittedToDistraction, 5f);
             if (!game.Creature.IsCommittedToDistraction) { Fail("The crash did not start the creature's approach."); yield break; }
             Mark("charge", "THE CRASH DRAWS IT OUT", "The campaign briefly guides the player's view to the service arch.");
@@ -118,8 +121,9 @@ namespace Haunter
         private IEnumerator CourtyardEscape()
         {
             if (!Enter(2)) yield break;
+            game.Player.EnterLevel(game.Campaign.Room.CrossingLookout);
             Mark("settle", "AFTER THE COLLAPSE", "Wait for the normal patrol to start.");
-            yield return Until(() => game.Creature.BehaviorName == "Patrolling", 24f);
+            yield return Until(() => game.Campaign.IntroStage == "Roaming" && game.Creature.BehaviorName == "Patrolling", 28f);
             var room = game.Campaign.Room;
             var creature = game.Creature;
             if (creature.BehaviorName != "Patrolling") { Fail("Normal courtyard patrol did not start."); yield break; }
@@ -140,6 +144,7 @@ namespace Haunter
             Mark("stairs", "TAKE THE SIDE STAIRS", "Cut to the base of the real route, then walk the stairs with collision active.");
             game.Player.EnterLevel(room.UpstairsApproach);
             yield return WalkPath(room.Exit.position, true, 25f);
+            yield return Until(() => game.LevelNumber == 3 && game.State == SessionState.Playing, 4f);
             if (game.LevelNumber != 3) { Fail("The alternate staircase did not reach the ballroom."); yield break; }
             Mark("upstairs-exit", "THE UPSTAIRS ENTRANCE", "Crossing the live upper exit enters the ballroom.");
             yield return new WaitForSecondsRealtime(1.3f);
@@ -148,9 +153,10 @@ namespace Haunter
         private IEnumerator CourtyardObservation()
         {
             if (!Enter(2)) yield break;
+            game.Player.EnterLevel(game.Campaign.Room.CrossingLookout);
             Mark("settle", "DEVELOPER VIEW", "Wait for the ordinary patrol to start after the collapse.");
             var listener = game.Creature;
-            yield return Until(() => listener.BehaviorName == "Patrolling", 24f);
+            yield return Until(() => game.Campaign.IntroStage == "Roaming" && listener.BehaviorName == "Patrolling", 28f);
             if (listener.BehaviorName != "Patrolling") { Fail("The observer did not see the patrol begin."); yield break; }
             Mark("patrol", "FOLLOW THE PATROL", "The camera follows the actual listener, with no player tracking marker.");
             yield return new WaitForSecondsRealtime(1.8f);

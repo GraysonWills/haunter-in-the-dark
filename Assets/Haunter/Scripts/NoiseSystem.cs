@@ -99,6 +99,16 @@ namespace Haunter
             return false;
         }
 
+        internal void ShowBallroomEcho(Vector3 position, float loudness, float load)
+        {
+            if (level != 3) return;
+            // This authored lesson uses the ordinary reveal and interference renderer.
+            // The staged echoes do not count as player noise or give the listener a target.
+            AcousticLoad = Mathf.Max(AcousticLoad, load);
+            AddPulse(position, loudness);
+            PlaySound(position, loudness * .58f, NoiseKind.Cane);
+        }
+
         public static void Emit(Vector3 position, float loudness, NoiseKind kind, GameObject source = null, int eventId = 0)
         {
             if (!Instance || !IsFinite(position) || float.IsNaN(loudness) || float.IsInfinity(loudness)) return;
@@ -133,7 +143,9 @@ namespace Haunter
         {
             if (level != 3 || noise.Kind == NoiseKind.Intro) return false;
             bool quiet = InQuietZone(noise.Position);
-            float energy = noise.Loudness * (noise.Kind == NoiseKind.Creature ? .14f : .28f) * (quiet ? .25f : 1f);
+            // A patrolling creature still produces visible and audible paw echoes. Its
+            // repeating gait contributes less energy than the room can shed on its own.
+            float energy = noise.Loudness * (noise.Kind == NoiseKind.Creature ? .04f : .28f) * (quiet ? .25f : 1f);
             AcousticLoad = Mathf.Clamp01(AcousticLoad + energy);
             if (quiet || reflections.Count >= ReflectionLimit) return false;
 

@@ -12,6 +12,7 @@ namespace Haunter
         public Transform Exit { get; private set; }
         public BoxCollider ExitThreshold { get; private set; }
         public Vector3 ApparentCrossing { get; private set; }
+        internal Vector3 CrossingLookout { get; private set; }
         public Vector3 CollapsePosition { get; private set; }
         public Vector3 UpstairsApproach { get; private set; }
         public Vector3 CreatureSpawn { get; private set; }
@@ -21,12 +22,25 @@ namespace Haunter
         public Vector3 FinalStaging { get; private set; }
         public Vector3 PrimaryLure { get; private set; }
         public Vector3 SecondaryLure { get; private set; }
+        public MazeScan MazeOverview { get; private set; }
         public bool NavMeshReady => navigationInstance.valid;
 
         private Transform architecture;
         private Transform props;
         private Material surface;
-        private GameObject debris;
+        internal const float CollapseDuration = 2.7f;
+        private Transform crossingArch;
+        private CrossingPiece[] crossingPieces;
+
+        private struct CrossingPiece
+        {
+            public Transform Transform;
+            public Collider Collider;
+            public Vector3 Standing, Fallen;
+            public Quaternion FallenRotation;
+            public float Delay, Duration;
+        }
+
         private Bounds navigationBounds;
         private NavMeshData navigationData;
         private NavMeshDataInstance navigationInstance;
@@ -59,10 +73,30 @@ namespace Haunter
             else if (isActiveAndEnabled) AddNavigation();
         }
 
-        public void SetCollapsed(bool collapsed)
+        internal bool HasReachedCrossing(Vector3 player)
+            => player.z >= (Spawn.z + ApparentCrossing.z) * .5f;
+
+        internal void ShowCrossingOutline(bool visible) => EchoMaterial.SetPersistent(crossingArch.gameObject, visible);
+
+        internal void AnimateCollapse(float seconds)
         {
-            if (debris == null || debris.activeSelf == collapsed) return;
-            debris.SetActive(collapsed);
+            foreach (var piece in crossingPieces)
+            {
+                float progress = Mathf.Clamp01((seconds - piece.Delay) / piece.Duration);
+                Vector3 position = Vector3.Lerp(piece.Standing, piece.Fallen, progress * Mathf.Sqrt(progress));
+                if (seconds < piece.Delay)
+                    position.x += Mathf.Sin(seconds * 38f + piece.Delay * 14f) * .035f;
+                piece.Transform.localPosition = position;
+                piece.Transform.localRotation = Quaternion.Slerp(Quaternion.identity, piece.FallenRotation,
+                    Mathf.SmoothStep(0f, 1f, progress));
+            }
+        }
+
+        internal void FinishCollapse()
+        {
+            AnimateCollapse(CollapseDuration);
+            foreach (var piece in crossingPieces)
+                if (piece.Collider) piece.Collider.enabled = true;
             RemoveNavigation();
             if (navigationData != null) Destroy(navigationData);
             navigationData = null;
@@ -121,6 +155,7 @@ namespace Haunter
             Spawn = World(2.8f, -13.3f);
             CreatureSpawn = World(-4, -17.05f);
             ApparentCrossing = World(0, 12);
+            CrossingLookout = World(2.8f, .18f);
             CollapsePosition = World(0, 13.3f, .2f);
             UpstairsApproach = World(10, -7.2f);
             Patrol = WorldPoints(new Vector2(-7.4f, 10), new Vector2(-10.2f, 3), new Vector2(-9.5f, -8),
@@ -142,10 +177,9 @@ namespace Haunter
             WallSpan("North façade, west", -13.2f, -1.75f, 14.2f, 5.6f);
             WallSpan("North façade, center", 1.75f, 8.65f, 14.2f, 5.6f);
             WallSpan("North façade, east", 11.35f, 13.2f, 14.2f, 5.6f);
-            Box("Lower entry lintel", V(0, 4.4f, 14.2f), V(3.5f, 2.4f, .38f));
             Box("Balcony foundation", V(10, 1.4f, 14.2f), V(2.7f, 2.8f, .38f));
             Floor("Lower crossing stones", V(0, -.073f, 9.6f), V(3.4f, .18f, 8.9f), false);
-            DoorTrim("Apparent ground entrance", 0, 13.97f, 0, 3.45f, false);
+            BuildCollapsibleCrossing();
             DoorTrim("Upper service entrance", 10, 13.97f, 2.8f, 2.55f, true);
 
             var fountain = PrototypeWorld.Primitive("Dry fountain basin", PrimitiveType.Cylinder, architecture,
@@ -174,20 +208,48 @@ namespace Haunter
                 Box("Balcony pillar", V(11.3f, 1.25f, z), V(.35f, 2.5f, .38f));
             MakeExit(10, 13, 2.8f, 2.15f);
 
-            debris = Group(architecture, "Collapsed north crossing").gameObject;
-            Box("Fallen arch masonry", V(0, .9f, 13.66f), V(3.76f, 1.8f, 1.18f), true, debris.transform);
-            Box("Tipped lintel", V(.1f, 1.68f, 13.53f), V(3.6f, .74f, .82f), false, debris.transform)
-                .transform.localRotation = Quaternion.Euler(15, -12, 16);
-            Box("Splintered cross brace", V(.52f, 1.33f, 13.1f), V(2.7f, .26f, .33f), false, debris.transform)
-                .transform.localRotation = Quaternion.Euler(-23, -20, -34);
-            Box("Debris toe", V(-.3f, .2f, 12.52f), V(2.5f, .4f, 1.04f), true, debris.transform);
-            debris.SetActive(false);
-
             Loose(new Vector2(3.3f, -11.7f), new Vector2(.3f, -11.2f), new Vector2(-4.1f, -11.6f),
                 new Vector2(-9.7f, -7), new Vector2(-11.8f, -.9f), new Vector2(-7.3f, .3f),
                 new Vector2(-8, 6.1f), new Vector2(-3.2f, 9.4f), new Vector2(2.9f, 7.2f),
                 new Vector2(2.4f, 2.2f), new Vector2(4.6f, -2.8f), new Vector2(6.9f, -5.5f),
                 new Vector2(8.2f, -7.7f), new Vector2(6.4f, 5), new Vector2(.9f, -4.2f));
+        }
+
+        private void BuildCollapsibleCrossing()
+        {
+            crossingArch = Group(architecture, "Lower crossing and timber canopy");
+            crossingPieces = new[]
+            {
+                CrossingBlock("West support", V(-1.52f, 1.48f, 11.6f), V(.30f, 2.96f, .34f),
+                    V(-1.76f, .37f, 12.11f), V(59, -28, -39), .3f, 1.14f),
+                CrossingBlock("East support", V(1.52f, 1.48f, 11.6f), V(.30f, 2.96f, .34f),
+                    V(1.32f, .48f, 11.64f), V(-57, 12, 38), .51f, 1.32f),
+                CrossingBlock("Front crossbeam", V(0, 3.06f, 11.59f), V(3.48f, .41f, .53f),
+                    V(-.14f, .29f, 12.08f), V(13, 18, 10), .46f, 1.4f, true),
+                CrossingBlock("West canopy rafter", V(-.91f, 3.32f, 12.7f), V(.23f, .23f, 2.57f),
+                    V(-1.22f, .52f, 11.91f), V(34, -33, -8), .58f, 1.25f),
+                CrossingBlock("East canopy rafter", V(.91f, 3.32f, 12.7f), V(.23f, .23f, 2.57f),
+                    V(.82f, .61f, 12.21f), V(-27, 36, -23), .62f, 1.53f),
+                CrossingBlock("West crown stone", V(-.89f, 4.19f, 14.05f), V(1.71f, 1.14f, .6f),
+                    V(-.9f, 1.40f, 13.28f), V(17, -16, 20), .75f, 1.62f),
+                CrossingBlock("East crown stone", V(.89f, 4.22f, 14.05f), V(1.71f, 1.18f, .6f),
+                    V(1.05f, .59f, 12.97f), V(-16, 27, -36), .86f, 1.73f),
+                CrossingBlock("Main lower lintel", V(0, 3.48f, 13.92f), V(3.72f, .97f, .94f),
+                    V(0, .76f, 13.66f), V(7, -6, 5), .74f, 1.96f, true),
+            };
+        }
+
+        private CrossingPiece CrossingBlock(string name, Vector3 standing, Vector3 scale, Vector3 fallen,
+            Vector3 rotation, float delay, float duration, bool blocksPath = false)
+        {
+            var block = Box(name, standing, scale, blocksPath, crossingArch);
+            var collider = blocksPath ? block.GetComponent<Collider>() : null;
+            if (collider) collider.enabled = false;
+            return new CrossingPiece
+            {
+                Transform = block.transform, Collider = collider, Standing = standing, Fallen = fallen,
+                FallenRotation = Quaternion.Euler(rotation), Delay = delay, Duration = duration
+            };
         }
 
         private void BuildBallroom()
@@ -211,6 +273,14 @@ namespace Haunter
             MakeExit(0, 17.6f, 0, 2.25f);
 
             Floor("Parquet border", V(0, -.074f, -3), V(15.3f, .18f, 25.2f), false);
+            Box("Entrance service table", V(0, .46f, -12.3f), V(3.4f, .92f, 1.05f));
+            Box("Service table top", V(0, .96f, -12.3f), V(3.55f, .13f, 1.15f), false);
+            PrototypeWorld.Primitive("Round display pedestal", PrimitiveType.Cylinder, architecture,
+                V(2.45f, .54f, -8.45f), V(2.08f, .54f, 2.08f), surface, true);
+            Box("Folding screen in the dance lane", V(-2.8f, .88f, -4.65f), V(2.4f, 1.76f, .58f));
+            Box("Screen cap rail", V(-2.8f, 1.77f, -4.65f), V(2.55f, .13f, .68f), false);
+            Box("Center banquet table", V(.45f, .5f, .05f), V(2.55f, 1f, 1.38f));
+            Box("Banquet table top", V(.45f, 1f, .05f), V(2.71f, .14f, 1.55f), false);
             for (int i = -1; i <= 1; i++)
                 Box("Raised ceiling beam", V(0, 5.35f, i * 9.2f), V(29.7f, .36f, .55f), false);
             foreach (float x in new[] { -7.7f, 7.7f })
@@ -249,9 +319,10 @@ namespace Haunter
             FinalStaging = World(0, 4.1f);
             PrimaryLure = World(-5.6f, 6.9f);
             SecondaryLure = World(5.5f, 7.6f);
-            Patrol = WorldPoints(new Vector2(-5.2f, 6.4f), new Vector2(-8.3f, 4.3f),
-                new Vector2(-7.6f, 1.2f), new Vector2(-8.2f, -5.3f), new Vector2(-5.1f, -4.1f),
-                new Vector2(-6.9f, 1.4f), new Vector2(-7.9f, 6.7f), new Vector2(-7.7f, 11));
+            // The first leg leads north; the remainder stays beyond the entry walls.
+            Patrol = WorldPoints(new Vector2(-5.2f, 6.4f), new Vector2(-5.2f, 9.6f),
+                new Vector2(-7.7f, 11), new Vector2(-9.4f, 7.25f), new Vector2(-8.25f, 4.55f),
+                new Vector2(-8.2f, .75f), new Vector2(-7.6f, 1.2f), new Vector2(-7.9f, 6.7f));
             navigationBounds = new Bounds(World(0, 0, 2), V(26, 10, 29));
             Floor("Service maze floor", V(0, -.16f, 0), V(24, .32f, 26.6f));
             SideWalls(12.1f, -13.2f, 13.2f, 3.2f);
@@ -294,6 +365,12 @@ namespace Haunter
                 new Vector2(-8.7f, -3.4f), new Vector2(6.9f, -5), new Vector2(9.4f, -3.2f),
                 new Vector2(-9.8f, 1.9f), new Vector2(9.45f, 1.5f), new Vector2(-.8f, 1.7f),
                 new Vector2(-.62f, 4.46f), new Vector2(.6f, 4.5f), new Vector2(-4.4f, 5.9f), new Vector2(4.15f, 5.71f));
+        }
+
+        public void PrepareMazeScan(GameSession session)
+        {
+            MazeOverview = gameObject.AddComponent<MazeScan>();
+            MazeOverview.Initialize(session, architecture, navigationBounds);
         }
 
         private void Ramp(Vector3 bottom, Vector3 top, float width)

@@ -10,14 +10,15 @@ namespace Haunter
         public ListenerCreature SecondCreature { get; private set; }
         public string Title => Level == 2 ? "COURTYARD" : Level == 3 ? "BALLROOM" : Level == 4 ? "FINAL MAZE" : "ARCHIVE";
         public bool CrossingCollapsed { get; private set; }
+        internal bool CanLeaveCourtyard => Level != 2 || courtyardStage == CourtyardStage.Roaming;
         public string Hint { get; private set; }
         public string HintHeading { get; private set; }
         public string IntroStage => Level != 2 ? "" : courtyardStage.ToString();
         public bool Quiet => Room && NoiseSystem.Instance && NoiseSystem.Instance.InQuietZone(session.Player.transform.position);
 
-        enum CourtyardStage { Crossing, Collapse, Guide, Roaming }
+        enum CourtyardStage { Crossing, Collapse, Impact, Guide, Roaming }
         CourtyardStage courtyardStage;
-        float enteredAt, stageAt, cueEnds, hintEnds;
+        float stageAt, cueEnds, hintEnds;
         bool savedInput, guiding;
         GameSession session;
         PrototypeWorld archive;
@@ -62,7 +63,7 @@ namespace Haunter
             Room = next;
             Level = number;
             CrossingCollapsed = false;
-            enteredAt = stageAt = Time.time;
+            stageAt = Time.time;
             session.Exit = Room.Exit;
             session.Player.EnterLevel(Room.Spawn);
             TouchControls.Reset();
@@ -82,18 +83,19 @@ namespace Haunter
                 courtyardStage = CourtyardStage.Crossing;
                 session.Creature.TutorialHold = true;
                 session.Creature.CatchSuppressed = true;
-                SetHint("THE COURTYARD", "The crossing leads to the next building. Follow the echo.", 5f);
+                SetHint("THE COURTYARD", "Cross the open yard toward the lower entrance.", 5f);
                 NoiseSystem.Emit(Room.Spawn + Vector3.forward * 4f, 1.2f, NoiseKind.Intro);
             }
             else if (number == 3)
             {
-                SetHint("THE BALLROOM", "Try one clean cane tap. When echoes overlap, the side alcoves are quieter.", 8f);
-                NoiseSystem.Emit(Room.Spawn + Vector3.forward * 4f, .9f, NoiseKind.Intro);
+                if (BrowserBridge.CaptureShot == 0)
+                    Room.gameObject.AddComponent<BallroomIntroduction>().Begin(session, this, Room.Spawn);
             }
             else
             {
                 SetHint("THE FINAL MAZE", "One guards the door. One roams. Throw two separate objects to draw them apart.", 9f);
                 NoiseSystem.Emit(Room.Spawn + Vector3.forward * 3f, 1f, NoiseKind.Intro);
+                Room.PrepareMazeScan(session);
             }
             atmosphere.SetLevel(number);
             return true;
@@ -121,23 +123,34 @@ namespace Haunter
             get
             {
                 if (!Room) return session.Exit.position;
-                if (Level == 2 && !CrossingCollapsed) return Room.ApparentCrossing;
                 if (Level == 2)
                 {
-                    Vector3 player = session.Player.transform.position;
-                    bool onUpstairsRoute = Mathf.Abs(player.x - Room.UpstairsApproach.x) < 1.5f
-                        && player.z > Room.UpstairsApproach.z;
-                    if (!onUpstairsRoute && player.y < Room.Exit.position.y - .9f) return Room.UpstairsApproach;
+                    if (!CrossingCollapsed) return Room.ApparentCrossing;
+                    if (NeedsCourtyardStairs()) return Room.UpstairsApproach;
                 }
                 return Room.Exit.position;
             }
+        }
+
+        bool NeedsCourtyardStairs()
+        {
+            Vector3 player = session.Player.transform.position;
+            Vector3 fromFoot = player - Room.UpstairsApproach;
+            bool onStairLane = Mathf.Abs(fromFoot.x) < 1.5f
+                && (Mathf.Abs(fromFoot.z) < 1.6f || (fromFoot.z > 0f && fromFoot.y > .22f));
+            return player.y < Room.Exit.position.y - .9f && !onStairLane;
         }
 
         public string Objective
         {
             get
             {
-                if (Level == 2) return CrossingCollapsed ? "FIND THE UPSTAIRS ENTRANCE" : "REACH THE CROSSING";
+                if (Level == 2)
+                {
+                    if (!CrossingCollapsed) return "REACH THE CROSSING";
+                    return NeedsCourtyardStairs() && session.Player.transform.position.z > Room.UpstairsApproach.z + 1.3f
+                        ? "BACKTRACK TO THE SIDE STAIRS" : "FIND THE UPSTAIRS ENTRANCE";
+                }
                 if (Level == 3) return "FIND THE FAR DOOR";
                 if (Level == 4) return "LEAD BOTH AWAY FROM THE EXIT";
                 return "FIND THE EXIT";
@@ -156,32 +169,49 @@ namespace Haunter
             if (!Room || session.State != SessionState.Playing) return;
             if (Time.time >= hintEnds) { Hint = ""; HintHeading = ""; }
             if (Level != 2 || courtyardStage == CourtyardStage.Roaming) return;
-            if (courtyardStage == CourtyardStage.Crossing && Time.time >= enteredAt + 3.5f)
+            if (courtyardStage == CourtyardStage.Crossing && Room.HasReachedCrossing(session.Player.transform.position))
             {
-                var creature = session.Creature;
-                creature.SetNavigationActive(false);
-                Room.SetCollapsed(true);
-                creature.SetNavigationActive(true);
-                CrossingCollapsed = true;
-                courtyardStage = CourtyardStage.Collapse;
-                stageAt = Time.time;
-                NoiseSystem.Emit(Room.CollapsePosition, 2f, NoiseKind.Collapse);
-                SetHint("THE CROSSING HAS FALLEN", "The crash carries back to the archive.", 3f);
-            }
-            else if (courtyardStage == CourtyardStage.Collapse && Time.time >= stageAt + .65f)
-            {
-                var creature = session.Creature;
                 savedInput = session.Player.AcceptInput;
                 session.Player.AcceptInput = false;
                 session.Player.CancelThrow();
                 TouchControls.Reset();
                 guiding = true;
+                Room.ShowCrossingOutline(true);
+                courtyardStage = CourtyardStage.Collapse;
+                stageAt = Time.time;
+                NoiseSystem.Emit(Room.CollapsePosition + Vector3.up * 2f, .7f, NoiseKind.Intro);
+                SetHint("THE CROSSING IS GIVING WAY", "The canopy and its supports are coming down.", 3f);
+            }
+            if (courtyardStage == CourtyardStage.Collapse)
+            {
+                float passed = Time.time - stageAt;
+                session.Player.GuideLookAt(Room.CollapsePosition + Vector3.up * 1.8f,
+                    1f - Mathf.Exp(-9f * Time.deltaTime));
+                if (passed < HaunterLevelWorld.CollapseDuration)
+                {
+                    Room.AnimateCollapse(passed);
+                    return;
+                }
+                var creature = session.Creature;
+                creature.SetNavigationActive(false);
+                Room.FinishCollapse();
+                creature.SetNavigationActive(true);
+                CrossingCollapsed = true;
+                courtyardStage = CourtyardStage.Impact;
+                stageAt = Time.time;
+                NoiseSystem.Emit(Room.CollapsePosition, 2f, NoiseKind.Collapse);
+                SetHint("THE CROSSING HAS FALLEN", "The crash carries back to the archive.", 3f);
+            }
+            else if (courtyardStage == CourtyardStage.Impact && Time.time >= stageAt + .55f)
+            {
+                Room.ShowCrossingOutline(false);
+                var creature = session.Creature;
                 creature.TutorialHold = false;
                 creature.BeginScriptedInvestigation(Room.CollapsePosition);
                 creature.CueTutorialPaw();
                 courtyardStage = CourtyardStage.Guide;
                 cueEnds = Time.time + 1.05f;
-                SetHint("IT HEARD THE CRASH", "Take the side stairs to the upstairs entrance.", 6f);
+                SetHint("IT HEARD THE CRASH", "Head back around the yard to the side stairs.", 7f);
             }
             if (courtyardStage == CourtyardStage.Guide)
             {
@@ -204,7 +234,7 @@ namespace Haunter
             if (session.Creature) session.Creature.CatchSuppressed = false;
         }
 
-        void SetHint(string heading, string text, float seconds)
+        internal void SetHint(string heading, string text, float seconds)
         {
             HintHeading = heading;
             Hint = text;

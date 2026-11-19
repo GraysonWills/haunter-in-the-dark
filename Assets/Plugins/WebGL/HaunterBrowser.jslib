@@ -14,8 +14,8 @@ mergeInto(LibraryManager.library, {
   Haunter_ResetTouchInput: function () {
     if (window.haunterTouch) window.haunterTouch.reset();
   },
-  Haunter_UpdateTouchState: function (state, actions, held, nearby, charge, menuFlags) {
-    if (window.haunterTouch) window.haunterTouch.update(state, actions, held, nearby, charge, menuFlags);
+  Haunter_UpdateTouchState: function (state, actions, held, nearby, charge, menuFlags, checkpoint, level) {
+    if (window.haunterTouch) window.haunterTouch.update(state, actions, held, nearby, charge, menuFlags, checkpoint, level);
   },
   Haunter_UpdateTouchTutorial: function (heading, instruction, frozen) {
     if (window.haunterTouch) window.haunterTouch.updateTutorial(UTF8ToString(heading), UTF8ToString(instruction), frozen !== 0);

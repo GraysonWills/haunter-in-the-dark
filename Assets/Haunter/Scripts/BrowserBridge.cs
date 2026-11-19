@@ -38,8 +38,10 @@ namespace Haunter
             public bool tutorialFrozen;
             public int level, primaryClaim, secondClaim;
             public string levelName, objective, introStage, primaryBehavior, secondaryBehavior;
+            public int checkpointLevel, loadingLevel, completedLevel;
             public float acousticLoad, hearingConfidence, secondDistractionSeconds;
             public bool reducedDistortion, crossingCollapsed, quietZone, primaryReflection, secondaryDistracted;
+            public bool mazeScanActive;
             public Vector3 primaryEstimate, primarySoundOrigin, secondaryPosition, routePoint,
                 primaryLure, secondaryLure, finalStaging;
         }
@@ -109,6 +111,7 @@ namespace Haunter
                 tutorialStage = session.Tutorial != null ? session.Tutorial.Stage.ToString() : "Inactive",
                 tutorialFrozen = session.Tutorial != null && session.Tutorial.WorldFrozen,
                 level = session.LevelNumber, levelName = session.Campaign.Title, objective = session.Campaign.Objective,
+                checkpointLevel = session.CheckpointLevel, loadingLevel = session.LoadingLevel, completedLevel = session.CompletedLevel,
                 introStage = session.Campaign.IntroStage, crossingCollapsed = session.Campaign.CrossingCollapsed,
                 quietZone = session.Campaign.Quiet, acousticLoad = NoiseSystem.Instance ? NoiseSystem.Instance.AcousticLoad : 0,
                 reducedDistortion = session.ReducedDistortion, routePoint = session.Campaign.Bearing,
@@ -131,6 +134,7 @@ namespace Haunter
                 snapshot.primaryLure = room.PrimaryLure;
                 snapshot.secondaryLure = room.SecondaryLure;
                 snapshot.finalStaging = room.FinalStaging;
+                snapshot.mazeScanActive = room.MazeOverview && room.MazeOverview.Active;
             }
             Haunter_PublishState(JsonUtility.ToJson(snapshot));
         }
@@ -143,6 +147,8 @@ namespace Haunter
             var session = GameSession.Instance;
             if (session == null) return;
             if (action == "begin") session.Begin();
+            else if (action.StartsWith("level-", StringComparison.Ordinal) && int.TryParse(action.Substring(6), out int level))
+                session.StartLevel(level);
             else if (action == "distortion" && session.State == SessionState.Paused) session.ToggleDistortion();
             else if (action == "resume") session.Resume();
             else if (action == "skip")
@@ -154,7 +160,9 @@ namespace Haunter
                     session.Resume();
                 }
             }
-            else if (action == "restart" && session.State != SessionState.Playing) session.Restart();
+            else if (action == "restart") session.RetryLevel();
+            else if (action == "title" && (session.State == SessionState.Paused || session.State == SessionState.Caught || session.State == SessionState.Escaped))
+                session.Restart();
         }
 
         public static void NotifyPointerLockRequest()
