@@ -8,6 +8,8 @@ namespace Haunter
     [DisallowMultipleComponent]
     public sealed class GameSession : MonoBehaviour
     {
+        enum ThrowGuide { Ring, Line, Arc }
+
         public static GameSession Instance { get; private set; }
         public PlayerController Player;
         public Transform Exit;
@@ -26,7 +28,10 @@ namespace Haunter
         float lastNoiseAt = -10f;
         string lastSound = "SILENCE";
         bool stylesReady;
+        ThrowGuide throwGuide;
         const float Width = 1600f, Height = 900f;
+        const int ChargeRingSegments = 40;
+        static readonly Vector2[] ChargeRing = CreateChargeRing();
 
         void Awake()
         {
@@ -36,6 +41,7 @@ namespace Haunter
             Campaign = gameObject.AddComponent<HaunterCampaign>();
             Campaign.Initialize(this);
             ReducedDistortion = PlayerPrefs.GetInt("haunter.reducedDistortion", 0) != 0;
+            throwGuide = ReadThrowGuide();
             State = SessionState.Ready;
             Time.timeScale = 0f;
             SetCursor(false);
@@ -275,23 +281,20 @@ namespace Haunter
                 Text(new Rect(850, 74, 130, 28), toExit.magnitude.ToString("0.0") + " M", label, .7f);
                 Text(new Rect(623, 77, 120, 22), LevelNumber == 2 ? "ROUTE BEARING" : "EXIT BEARING", small, .4f);
             }
+            if (Player != null && Player.ChargingThrow && Player.ViewCamera != null) DrawThrowFeedback();
             DrawCrosshair(new Vector2(800, 450));
             if (Player != null)
             {
                 string prompt = string.Empty;
-                if (Player.HeldObject != null) prompt = (TouchControls.Enabled ? "HOLD THROW  /  TAP DROP     " : "HOLD LMB  THROW / Q  DROP     ") + Player.HeldObject.DisplayName.ToUpperInvariant();
+                if (Player.ChargingThrow)
+                    prompt = TouchControls.Enabled ? "RELEASE TO THROW" : "RELEASE LMB TO THROW";
+                else if (Player.HeldObject != null) prompt = (TouchControls.Enabled ? "HOLD THROW  /  TAP DROP     " : "HOLD LMB  THROW / Q  DROP     ") + Player.HeldObject.DisplayName.ToUpperInvariant();
                 else if (Player.NearbyObject != null) prompt = (TouchControls.Enabled ? "TAP PICK UP     " : "E  PICK UP ") + Player.NearbyObject.DisplayName.ToUpperInvariant();
                 else if (PlayerNearExit(2.2f)) prompt = (TouchControls.Enabled ? "TAP EXIT" : "E  CONTINUE") + "  /  " + Campaign.Title;
                 if (!string.IsNullOrEmpty(prompt) && (Tutorial == null || !Tutorial.Active))
                 {
                     Fill(new Rect(500, 526, 600, 45), .72f, false);
                     GUI.Label(new Rect(500, 526, 600, 45), prompt, centered);
-                }
-                if (Player.ChargingThrow)
-                {
-                    Fill(new Rect(700, 590, 200, 2), .2f);
-                    Fill(new Rect(700, 590, 200 * Player.ThrowCharge, 2), .95f);
-                    Text(new Rect(700, 605, 200, 25), "RELEASE TO THROW", centered, .65f);
                 }
                 if (!TouchControls.Enabled && (Tutorial == null || !Tutorial.Active || Tutorial.Stage == TutorialStage.TapCane))
                 {
@@ -323,6 +326,102 @@ namespace Haunter
                 GUI.Label(new Rect(345, 665, 910, 30), Campaign.HintHeading, tutorialHeading);
                 Text(new Rect(345, 700, 910, 43), Campaign.Hint, tutorialCopy, .9f);
             }
+        }
+
+        static ThrowGuide ReadThrowGuide()
+        {
+            // The comparison modes affect only the guide and can be used from capture links.
+            string mode = string.Empty;
+#if UNITY_WEBGL && !UNITY_EDITOR
+            if (System.Uri.TryCreate(Application.absoluteURL, System.UriKind.Absolute, out var page))
+                foreach (string entry in page.Query.TrimStart('?').Split('&'))
+                    if (entry.StartsWith("throwGuide=", System.StringComparison.Ordinal))
+                        mode = entry.Substring("throwGuide=".Length);
+#else
+            foreach (string argument in System.Environment.GetCommandLineArgs())
+                if (argument.StartsWith("-haunterThrowGuide=", System.StringComparison.Ordinal))
+                    mode = argument.Substring("-haunterThrowGuide=".Length);
+#endif
+            return mode == "ring" ? ThrowGuide.Ring : mode == "line" ? ThrowGuide.Line : ThrowGuide.Arc;
+        }
+
+        static Vector2[] CreateChargeRing()
+        {
+            var ring = new Vector2[ChargeRingSegments + 1];
+            for (int i = 0; i < ring.Length; i++)
+            {
+                float angle = Mathf.PI * (2f * i / ChargeRingSegments - .5f);
+                ring[i] = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+            }
+            return ring;
+        }
+
+        void DrawThrowFeedback()
+        {
+            if (Event.current.type != EventType.Repaint) return;
+            // Use actual pixels so the reticle stays round on portrait touch layouts.
+            Matrix4x4 hudMatrix = GUI.matrix;
+            GUI.matrix = Matrix4x4.identity;
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 600f, .7f, 1.8f);
+            if (throwGuide != ThrowGuide.Ring) DrawThrowGuide(scale);
+
+            Vector2 center = new Vector2(Screen.width * .5f, Screen.height * .5f);
+            float radius = 21f * scale;
+            float completed = Player.ThrowCharge * ChargeRingSegments;
+            for (int i = 0; i < ChargeRingSegments; i++)
+            {
+                Vector2 from = center + ChargeRing[i] * radius;
+                Vector2 to = center + ChargeRing[i + 1] * radius;
+                Line(from, to, .76f, 4.5f * scale, false);
+                Line(from, to, .5f, 1.5f * scale);
+                if (i < completed)
+                    Line(from, Vector2.Lerp(from, to, completed - i), .98f, 2.5f * scale);
+            }
+            GUI.matrix = hudMatrix;
+        }
+
+        void DrawThrowGuide(float scale)
+        {
+            Camera camera = Player.ViewCamera;
+            Vector3 origin = Player.NominalThrowOrigin;
+            Vector3 velocity = Player.PreviewThrowVelocity;
+            // The short near-camera offset makes the start readable beside the reticle.
+            // It fades out into the game-space launch trajectory.
+            Vector3 handSide = camera.transform.right * Mathf.Min(.2f, camera.aspect * .22f);
+            const float startTime = .08f;
+            const float endTime = 1.15f;
+            if (throwGuide == ThrowGuide.Line)
+            {
+                if (ProjectThrowPoint(camera, origin + velocity * startTime + handSide, out Vector2 start)
+                    && ProjectThrowPoint(camera, origin + velocity * endTime, out Vector2 end))
+                    Line(start, end, .65f, 1.45f * scale);
+                return;
+            }
+
+            // Project an unobstructed flight. A sightless aiming aid must not sample
+            // collision geometry or suggest where the actual prop will hit.
+            const int steps = 24;
+            Vector2 last = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+            for (int i = 0; i <= steps; i++)
+            {
+                float progress = i / (float)steps;
+                float time = Mathf.Lerp(startTime, endTime, progress);
+                float side = 1f - progress;
+                Vector3 point = origin + velocity * time + Physics.gravity * (.5f * time * time) + handSide * (side * side);
+                if (!ProjectThrowPoint(camera, point, out Vector2 pixel) || (pixel - last).sqrMagnitude < 16f * scale * scale)
+                    continue;
+                last = pixel;
+                float size = Mathf.Lerp(3.8f, 2f, progress) * scale;
+                Fill(new Rect(pixel.x - size * .5f - 1f, pixel.y - size * .5f - 1f, size + 2f, size + 2f), .65f, false);
+                Fill(new Rect(pixel.x - size * .5f, pixel.y - size * .5f, size, size), Mathf.Lerp(.86f, .32f, progress));
+            }
+        }
+
+        static bool ProjectThrowPoint(Camera camera, Vector3 point, out Vector2 pixel)
+        {
+            Vector3 screen = camera.WorldToScreenPoint(point);
+            pixel = new Vector2(screen.x, Screen.height - screen.y);
+            return screen.z > camera.nearClipPlane;
         }
 
         void DrawTutorial()
@@ -432,13 +531,13 @@ namespace Haunter
             GUI.color = old;
         }
 
-        static void Line(Vector2 a, Vector2 b, float alpha, float thickness = 1f)
+        static void Line(Vector2 a, Vector2 b, float alpha, float thickness = 1f, bool white = true)
         {
             Matrix4x4 old = GUI.matrix;
             Vector2 delta = b - a;
             GUI.matrix = old * Matrix4x4.TRS(new Vector3(a.x, a.y, 0),
                 Quaternion.Euler(0, 0, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg), Vector3.one);
-            Fill(new Rect(0, -thickness * .5f, delta.magnitude, thickness), alpha);
+            Fill(new Rect(0, -thickness * .5f, delta.magnitude, thickness), alpha, white);
             GUI.matrix = old;
         }
 

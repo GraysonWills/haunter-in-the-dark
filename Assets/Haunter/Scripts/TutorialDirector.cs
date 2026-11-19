@@ -315,7 +315,7 @@ namespace Haunter
                 Vector3 candidate = floor.position + Vector3.up * .3f;
                 if (Physics.CheckSphere(candidate, .23f, 1, QueryTriggerInteraction.Ignore)) continue;
                 Vector3 eye = Player.ViewCamera.transform.position;
-                Vector3 release = eye + (candidate - eye).normalized * .7f;
+                Vector3 release = eye + (candidate - eye).normalized * ThrowableObject.NominalReleaseDistance;
                 float flight = FlightTime(release, candidate);
                 // WatchDistraction protects the immobilized player while this real arc lands.
                 // Validate reachability below rather than rejecting safe, slower lateral throws.
@@ -342,7 +342,7 @@ namespace Haunter
 
         public Vector3 GetThrowVelocity()
         {
-            Vector3 start = Player.ViewCamera.transform.position + Player.ViewCamera.transform.forward * .7f;
+            Vector3 start = Player.NominalThrowOrigin;
             return BallisticVelocity(start, ThrowTarget, FlightTime(start, ThrowTarget));
         }
 

@@ -1,6 +1,6 @@
 # Browser build and hosting
 
-Play at **https://graysonwills.github.io/haunter-in-the-dark/** using a desktop keyboard/mouse or the browser's touch controls. The browser and Windows versions use the same scene and gameplay code; the published Windows download remains v0.4.0 and is not replaced by this browser update.
+Play at **https://graysonwills.github.io/haunter-in-the-dark/** using a desktop keyboard/mouse or the browser's touch controls. The browser and Windows builds include all four levels and use the same gameplay code.
 
 ## Build
 
@@ -28,13 +28,15 @@ Select **Play in browser** to load the game, then use the game's start button or
 
 Use WASD to move. Hold **either Shift key or C** to crouch, and hold **R** to sprint. **Shift + W** moves forward quietly; **R + W** runs forward. These browser bindings avoid the Ctrl + W tab-closing shortcut. Crouching takes priority if both crouch and sprint are held. R still restarts the game after an ending. The Windows player retains Ctrl/C for crouching and Shift for sprinting.
 
+Hold left mouse while carrying an object to charge it. The ring around the crosshair fills and the object draws back. The aim arc shows the intended flight before any collision. Press **Space** or right mouse while charging to reveal nearby obstacles with the cane.
+
 ### Touch controls on phones and tablets
 
 Touch mode activates automatically on compatible touch devices. Use the **Touch controls** toggle before beginning or while paused to change input modes. Append `?touch=1` to force touch mode, or `?touch=0` to choose keyboard/mouse controls.
 
 - Drag the **left stick** to move; drag an empty area of the view to look.
 - Tap **Cane** to send an echo. Tap **Pick up** or **Exit** when the corresponding interaction is available.
-- Hold **Throw** to charge, then release. Tap **Drop** to put down the held object.
+- Hold **Throw** to charge, then release. Tap **Cane** with a second finger to reveal surfaces while charging. Tap **Drop** to put down the held object.
 - Tap **Crouch** to toggle quiet movement; hold **Sprint** while moving to run.
 - Tap **Pause** to open the menu. Its large buttons provide **Resume**, **Start again**, and **Skip tutorial & resume**. The touch title screen offers **Skip tutorial**; the desktop title labels that option **Play without tutorial**.
 

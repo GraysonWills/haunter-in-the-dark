@@ -44,6 +44,10 @@ namespace Haunter
         public bool ChargingThrow { get; private set; }
         public float CaneReady { get { return Mathf.Clamp01((Time.time - lastTap) / CaneCooldown); } }
         TutorialDirector Tutorial => GameSession.Instance != null ? GameSession.Instance.Tutorial : null;
+        internal Vector3 NominalThrowOrigin => ViewCamera.transform.position
+            + ViewCamera.transform.forward * ThrowableObject.NominalReleaseDistance;
+        internal Vector3 PreviewThrowVelocity => Tutorial != null && Tutorial.Stage == TutorialStage.Throw
+            ? Tutorial.GetThrowVelocity() : ChargedThrowVelocity();
         public PlayerActions AllowedActions => Tutorial != null ? Tutorial.Actions : PlayerActions.All;
         bool Allows(PlayerActions action) => (AllowedActions & action) != 0;
 
@@ -231,10 +235,13 @@ namespace Haunter
             if (startThrow) { ChargingThrow = true; chargeStart = Time.unscaledTime; }
             if (ChargingThrow) ThrowCharge = Mathf.Clamp01((Time.unscaledTime - chargeStart) / .8f);
             if (ChargingThrow && (touch ? TouchControls.Pressed(TouchControls.ThrowReleased) : Input.GetMouseButtonUp(0)))
-            {
-                Vector3 direction = (ViewCamera.transform.forward + Vector3.up * .14f).normalized;
-                ThrowHeld(direction * Mathf.Lerp(7.2f, 15f, ThrowCharge));
-            }
+                ThrowHeld(ChargedThrowVelocity());
+        }
+
+        Vector3 ChargedThrowVelocity()
+        {
+            Vector3 direction = (ViewCamera.transform.forward + Vector3.up * .14f).normalized;
+            return direction * Mathf.Lerp(7.2f, 15f, ThrowCharge);
         }
 
         public void PickUp(ThrowableObject item)
@@ -342,7 +349,10 @@ namespace Haunter
             if (handAnchor != null)
             {
                 float sway = Mathf.Sin(gait * .5f) * .012f;
-                Vector3 offset = new Vector3(.36f + sway, -.3f - ThrowCharge * .08f, .65f - ThrowCharge * .16f);
+                float windUp = Mathf.SmoothStep(0f, 1f, ThrowCharge);
+                float handRight = Mathf.Min(.36f, ViewCamera.aspect * .27f);
+                Vector3 offset = new Vector3(handRight + sway - windUp * .06f,
+                    -.3f + windUp * .11f, .65f - windUp * .19f);
                 if (HeldObject != null)
                 {
                     float safeScale = GetSafeHandScale(offset, HeldObject.HoldRadius);
@@ -353,7 +363,7 @@ namespace Haunter
                 // Scaling both distance and geometry preserves its apparent size in perspective.
                 handAnchor.localPosition = offset * handScale;
                 handAnchor.localScale = Vector3.one * handScale;
-                handAnchor.localRotation = Quaternion.Euler(ThrowCharge * -18f, 0f, sway * 40f);
+                handAnchor.localRotation = Quaternion.Euler(-44f * windUp, -22f * windUp, sway * 40f + 27f * windUp);
             }
         }
 

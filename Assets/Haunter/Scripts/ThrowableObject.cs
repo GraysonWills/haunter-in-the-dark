@@ -6,6 +6,7 @@ namespace Haunter
     [RequireComponent(typeof(Rigidbody))]
     public sealed class ThrowableObject : MonoBehaviour
     {
+        internal const float NominalReleaseDistance = .7f;
         public string DisplayName = "FOUND OBJECT";
         public bool IsHeld { get; private set; }
         public Rigidbody Body { get { EnsureComponents(); return body; } }
@@ -91,7 +92,7 @@ namespace Haunter
             {
                 Vector3 origin = carrierCamera.transform.position;
                 Vector3 forward = carrierCamera.transform.forward;
-                float distance = .7f;
+                float distance = NominalReleaseDistance;
                 // The carried collider is disabled. Exclude only the player; walls and other props
                 // still shorten the release distance, so an object cannot be thrown through a wall.
                 if (Physics.SphereCast(origin, safeRadius, forward, out RaycastHit hit, distance,

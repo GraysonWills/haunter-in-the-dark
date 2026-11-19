@@ -4,11 +4,13 @@ A playable first-person Unity horror concept. Sound is your only sight: footstep
 
 **[Play in your browser](https://graysonwills.github.io/haunter-in-the-dark/)** · [Download for Windows](https://github.com/GraysonWills/haunter-in-the-dark/releases/latest/download/HaunterInTheDark-Windows.zip) · [Release notes and source downloads](https://github.com/GraysonWills/haunter-in-the-dark/releases/latest)
 
-## Four-level development build
+## Four-level release
 
-The development build adds the courtyard, ballroom, and final maze after the original archive tutorial. Find a route upstairs after a collapse, let overlapping echoes settle in the ballroom's quiet alcoves, and give each maze creature its own distraction. The public browser link above opens the released build.
+The courtyard, ballroom, and final maze follow the original archive tutorial. Find a route upstairs after a collapse, let overlapping echoes settle in the ballroom's quiet alcoves, and give each maze creature its own distraction.
 
 On the pause menu, **Reduce distortion** softens the ballroom's overlapping outlines. It leaves collisions, reach and routes fixed. The [expansion design](docs/EXPANSION-DESIGN.md) includes the maps, encounter walkthroughs, and research.
+
+Hold Throw to fill the ring around the crosshair and draw the object back. The arc shows the intended throw, including behind unseen obstacles. Tap the cane while charging to reveal nearby surfaces before releasing. The object can still hit walls and furniture.
 
 ![A cane ripple reveals white outlines across the dark room](docs/evidence/03-cane-ripple.png)
 
@@ -29,7 +31,7 @@ Use the **Touch controls** toggle before starting or while paused to choose the 
 
 This download is a **Windows 64-bit desktop build**; Unity is not needed to play. GitHub's **Code → Download ZIP** contains the Unity source project, not the playable Windows build.
 
-The downloadable Windows release remains **v0.4.0**. This touch-controls update is for the browser build.
+The browser and Windows releases include all four levels and the updated throw guide. Browser touch controls work alongside keyboard and mouse.
 
 ## Controls and objective
 
@@ -104,7 +106,7 @@ The synthetic audio, procedural room and creature are original placeholders. The
 - **The listener → ListenerCreature:** chase/return speeds, paw interval, source-specific hearing, object listening time and guard offset. Footstep range is `clamp(loudness² × 80, 2, 28)` metres; cane range is `min(loudness × 14, 16)`; impact range is `min(loudness × 6, 8)`. Player steps grant 18–28 pawsteps and cane taps 12–20. Object investigations follow the full reachable path, then linger for `objectListenSeconds` (5 by default). The guard anchor is 2.2 m in front of the exit.
 - **PrototypeWorld.cs:** room layout and prop positions. Navigation is rebuilt at runtime around static colliders; loose props are physical but do not carve the navigation mesh.
 
-This is a single-level prototype with primitive art and procedural sound. The screen-space outline effect obeys camera occlusion: it does not reveal objects through solid walls. Large furniture is handled by navigation; small loose objects may be pushed by the creature.
+The screen-space echo outlines obey camera occlusion. Large furniture is handled by navigation, and the creature can push small loose objects.
 
 `Haunter → Apply distraction balance and build` applies the version 0.3 creature tuning/spawn to the saved scene without rebuilding the room. Ordinary builds preserve Inspector tuning.
 
