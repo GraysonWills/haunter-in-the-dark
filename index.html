@@ -65,7 +65,7 @@
       footer { flex-direction: column; gap: 12px; }
     }
   </style>
-  <link rel="stylesheet" href="touch-controls.css?v=0.5.1">
+  <link rel="stylesheet" href="touch-controls.css?v=0.6.0">
 </head>
 <body>
   <main>
@@ -82,7 +82,7 @@
         <strong id="touch-tutorial-heading" data-tutorial-heading></strong>
         <p id="touch-tutorial-copy" data-tutorial-copy></p>
       </aside>
-      <div id="touch-menu" hidden aria-label="Game menu"><button id="touch-begin" type="button">Begin</button><button id="touch-resume" type="button" hidden>Resume</button><button id="touch-restart" type="button" hidden>Start again</button><button id="touch-skip" type="button">Skip tutorial</button></div>
+      <div id="touch-menu" hidden aria-label="Game menu"><button id="touch-begin" type="button">Begin</button><button id="touch-resume" type="button" hidden>Resume</button><button id="touch-restart" type="button" hidden>Start again</button><button id="touch-skip" type="button">Skip tutorial</button><button id="touch-distortion" type="button" hidden aria-pressed="false">Reduce distortion</button></div>
       <button id="exit-expanded" type="button" hidden>Exit expanded view</button>
       <div class="cover" id="cover">
         <div class="echo-mark" aria-hidden="true"></div>
@@ -99,9 +99,9 @@
       <div><h2>Reach the exit</h2><p>Every footstep and cane tap sends a ripple through the room, revealing its edges. The creature hears you too. Throw an object nearby to lure it away from the door. Once it reaches the sound, you have five seconds to slip past. Its pawsteps show you where it is.</p></div>
       <div><h2>Controls</h2><dl id="keyboard-instructions"><dt>WASD / Mouse</dt><dd>Move / Look</dd><dt>Space / Right mouse</dt><dd>Tap cane</dd><dt>Hold Shift / C · Hold R</dt><dd>Crouch · Sprint</dd><dt>E · Hold left mouse</dt><dd>Pick up · Charge and throw</dd><dt>Q · Esc</dt><dd>Drop · Pause / release mouse</dd></dl><dl id="touch-instructions" hidden><dt>Left stick / Drag scene</dt><dd>Move / Look</dd><dt>Tap cane / Pick up</dt><dd>Reveal the room / Take an object</dd><dt>Hold to throw</dt><dd>Hold to charge, release to throw</dd><dt>Crouch / Hold to run</dt><dd>Toggle quiet movement / Sprint</dd><dt>Drop / Pause</dt><dd>Put down an object / Pause the game</dd></dl></div>
     </section>
-    <footer><span>A single-room prototype. WebGL 2 required. Touch or keyboard and mouse.</span><div class="links"><a href="https://github.com/GraysonWills/haunter-in-the-dark" target="_blank" rel="noopener">Source &amp; build guide ↗</a><a href="https://github.com/GraysonWills/haunter-in-the-dark/releases/latest" target="_blank" rel="noopener">Windows download ↗</a></div></footer>
+    <footer><span>Four connected levels. WebGL 2 required. Touch or keyboard and mouse.</span><div class="links"><a href="https://github.com/GraysonWills/haunter-in-the-dark" target="_blank" rel="noopener">Source &amp; build guide ↗</a><a href="https://github.com/GraysonWills/haunter-in-the-dark/releases/latest" target="_blank" rel="noopener">Windows download ↗</a></div></footer>
   </main>
-  <script src="touch-controls.js?v=0.5.1"></script>
+  <script src="touch-controls.js?v=0.6.0"></script>
   <script>
     const canvas = document.getElementById("unity-canvas");
     const cover = document.getElementById("cover");
@@ -154,13 +154,13 @@
       window.haunterTouch.prepareForPlay();
       const buildUrl = "Build";
       const config = {
-        dataUrl: buildUrl + "/cc8b070f909488bdc2d346bcada81043.data.unityweb",
-        frameworkUrl: buildUrl + "/3476889b30c211d1f3ebdeb2bede4bf3.js.unityweb",
-        codeUrl: buildUrl + "/0bb96a39f858e0328ede8665cf05703e.wasm.unityweb",
+        dataUrl: buildUrl + "/0906922291b002ada9d8fceaf4283374.data.unityweb",
+        frameworkUrl: buildUrl + "/790bd4b6374f53a538ef1bfed9d0d12d.js.unityweb",
+        codeUrl: buildUrl + "/9d9c5b0ae7da99f0aca65b1b2cdc596c.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "Haunter Prototype",
         productName: "Haunter in the Dark",
-        productVersion: "0.5.1",
+        productVersion: "0.6.0",
         devicePixelRatio: Math.min(window.devicePixelRatio || 1, window.haunterTouch.enabled ? 1 : 1.5),
         showBanner: (message, type) => { if (type === "error") showError(message); else console.warn(message); }
       };

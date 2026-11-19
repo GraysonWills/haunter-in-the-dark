@@ -15,7 +15,8 @@
   const tutorialCopy = document.getElementById("touch-tutorial-copy");
   const menuButtons = {
     begin: document.getElementById("touch-begin"), skip: document.getElementById("touch-skip"),
-    resume: document.getElementById("touch-resume"), restart: document.getElementById("touch-restart")
+    resume: document.getElementById("touch-resume"), restart: document.getElementById("touch-restart"),
+    distortion: document.getElementById("touch-distortion")
   };
   const controls = {
     cane: { element: document.getElementById("touch-cane"), action: 16, pulse: 1 },
@@ -39,6 +40,7 @@
   let expanded = false, savedScrollY = 0;
   let nativeFullscreen = false;
   let uiSession = -1, uiActions = -1, uiHeld = null, uiNearby = -1, uiEnabled = null;
+  let menuFlags = 1, uiMenuFlags = -1;
   const pointers = new Map();
 
   function allowed(mask) { return enabled && session === 1 && (mask === 0 || (actions & mask) !== 0); }
@@ -160,6 +162,7 @@
   document.addEventListener("visibilitychange", () => { if (document.hidden) interrupt(); });
   window.addEventListener("orientationchange", interrupt);
   for (const [action, element] of Object.entries(menuButtons)) {
+    if (!element) continue;
     element.addEventListener("click", event => {
       event.preventDefault(); event.stopPropagation();
       if (!enabled || session === 1 || !window.unityInstance) return;
@@ -198,19 +201,25 @@
       ? "Tap Begin. Use the left stick to move and drag the scene to look. Landscape gives you more room."
       : "Press Enter or click Begin to play. Esc pauses and releases the mouse.";
   }
-  function update(nextSession, nextActions, nextHeld, nextNearby, charge) {
+  function update(nextSession, nextActions, nextHeld, nextNearby, charge, flags = menuFlags) {
     if (nextSession !== session) reset();
     session = nextSession; actions = nextActions; held = !!nextHeld; nearby = nextNearby;
-    if (uiSession !== session || uiActions !== actions || uiHeld !== held || uiNearby !== nearby || uiEnabled !== enabled) {
-      uiSession = session; uiActions = actions; uiHeld = held; uiNearby = nearby; uiEnabled = enabled;
+    menuFlags = flags;
+    if (uiSession !== session || uiActions !== actions || uiHeld !== held || uiNearby !== nearby || uiEnabled !== enabled || uiMenuFlags !== menuFlags) {
+      uiSession = session; uiActions = actions; uiHeld = held; uiNearby = nearby; uiEnabled = enabled; uiMenuFlags = menuFlags;
       layer.hidden = !enabled || session !== 1;
       menu.hidden = !enabled || session === 1 || window.haunterLoadingState !== "ready";
       tutorial.hidden = !enabled || session !== 1 || !tutorialHeading.textContent;
       menuButtons.begin.hidden = session !== 0;
-      menuButtons.skip.hidden = session !== 0 && session !== 2;
+      menuButtons.skip.hidden = session !== 0 && (session !== 2 || !(menuFlags & 1));
       menuButtons.skip.textContent = session === 0 ? "Skip tutorial" : "Skip tutorial & resume";
       menuButtons.resume.hidden = session !== 2;
       menuButtons.restart.hidden = session === 0 || session === 1;
+      if (menuButtons.distortion) {
+        menuButtons.distortion.hidden = session !== 2;
+        menuButtons.distortion.setAttribute("aria-pressed", String(!!(menuFlags & 2)));
+        menuButtons.distortion.textContent = (menuFlags & 2) ? "Reduced distortion on" : "Reduce distortion";
+      }
       toggle.disabled = session === 1;
       stick.classList.toggle("touch-unavailable", !allowed(2));
       stick.setAttribute("aria-disabled", String(!allowed(2)));
